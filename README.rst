@@ -96,7 +96,8 @@ dependencies. Install it from PyPI the usual way::
 
     pip install async_stagger
 
-The documentation can be found here: http://async_stagger.readthedocs.io
+The documentation can be found here:
+http://async-stagger.readthedocs.io/en/latest/
 
 This project is licensed under the MIT license.
 

@@ -6,6 +6,8 @@
 Welcome to async_stagger's documentation!
 =========================================
 
+Project home page: https://github.com/twisteroidambassador/async_stagger
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
