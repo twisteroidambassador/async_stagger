@@ -90,11 +90,14 @@ Where can I get it?
 (At the time I'm writing this README, none of the links below are live yet.
 Hopefully I remember to check them.)
 
-``async_stagger`` requires Python 3.6 or later. Most likely it will work just
-fine on Python 3.5, but I have not tested it. It does not have any external
+``async_stagger`` requires Python 3.6 or later. (It doesn't work on Python 3.5
+for a somewhat trivial reason: trailing commas in function definition argument
+lists. If those pesky commas are removed, the code should probably run well
+enough.)
+It does not have any external
 dependencies. Install it from PyPI the usual way::
 
-    pip install async_stagger
+    pip install async-stagger
 
 The documentation can be found here:
 http://async-stagger.readthedocs.io/en/latest/

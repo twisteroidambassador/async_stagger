@@ -16,6 +16,21 @@ Project home page: https://github.com/twisteroidambassador/async_stagger
    reference
 
 
+Installation
+============
+
+Install through PyPI as usual:
+
+.. code-block:: console
+
+   pip install async-stagger
+
+Python 3.6 or above is required. (Python 3.5 would have worked, if not for
+issue9232_, and some trailing commas in function definition argument lists.)
+
+.. _issue9232: https://bugs.python.org/issue9232
+
+
 Making TCP connections using Happy Eyeballs
 ===========================================
 
