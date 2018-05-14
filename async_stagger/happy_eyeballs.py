@@ -214,7 +214,7 @@ async def create_connected_sock(
 
         interleave: Whether to interleave addresses returned by
             ``getaddrinfo()`` by address family. 0 means not to interleave and
-            simply use the returned order., An integer >= 1 is interpreted as
+            simply use the returned order. An integer >= 1 is interpreted as
             "First Address Family Count" defined in RFC8305, i.e. the reordered
             list will have this many addresses for the first address family,
             and the rest will be interleaved one to one.
@@ -238,7 +238,8 @@ async def create_connected_sock(
     else:
         local_addrinfos_task = None
 
-    await asyncio.wait(resolve_tasks, loop=loop)
+    # Use gather() instead of wait() to make sure cancellation propagates in
+    await asyncio.gather(*resolve_tasks, loop=loop)
 
     addrinfos = remote_addrinfos_task.result()
     if not addrinfos:
