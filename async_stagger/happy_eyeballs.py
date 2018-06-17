@@ -86,7 +86,7 @@ async def _ensure_resolved(address, *, family=0, type_=socket.SOCK_STREAM,
     info = _ipaddr_info(host, port, family, type_, proto)
     if info is not None:
         # "host" is already a resolved IP.
-        return info
+        return [info]
     else:
         return await loop.getaddrinfo(host, port, family=family, type=type_,
                                       proto=proto, flags=flags)
