@@ -12,6 +12,8 @@ __all__ = ['create_connected_sock', 'create_connection', 'open_connection']
 _DEFAULT_DELAY = 0.3
 _DEFAULT_LIMIT = 2 ** 16
 
+_HAS_IPv6 = hasattr(socket, 'AF_INET6')
+
 
 def _ipaddr_info(host, port, family, type_, proto):
     # This function is copied from asyncio/base_events.py with minimal
@@ -53,7 +55,7 @@ def _ipaddr_info(host, port, family, type_, proto):
 
     if family == socket.AF_UNSPEC:
         afs = [socket.AF_INET]
-        if hasattr(socket, 'AF_INET6'):
+        if _HAS_IPv6:
             afs.append(socket.AF_INET6)
     else:
         afs = [family]
@@ -69,7 +71,10 @@ def _ipaddr_info(host, port, family, type_, proto):
         try:
             socket.inet_pton(af, host)
             # The host has already been resolved.
-            return af, type_, proto, '', (host, port)
+            if _HAS_IPv6 and af == socket.AF_INET6:
+                return af, type, proto, '', (host, port, 0, 0)
+            else:
+                return af, type, proto, '', (host, port)
         except OSError:
             pass
 
