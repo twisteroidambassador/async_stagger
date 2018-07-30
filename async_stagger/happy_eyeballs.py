@@ -2,8 +2,8 @@ import asyncio
 import socket
 from collections import OrderedDict
 from functools import partial
-from itertools import cycle, islice
-from typing import Callable, Union, Tuple, Optional
+from itertools import cycle, islice, product
+from typing import Callable, Union, Tuple, Optional, Iterable
 
 from .stagger import staggered_race
 
@@ -92,28 +92,22 @@ async def _ensure_resolved(address, *, family=0, type_=socket.SOCK_STREAM,
                                       proto=proto, flags=flags)
 
 
-async def _connect_sock(addr_info, local_addr_infos=None, *, loop=None):
+async def _connect_sock(addr_info, local_addr_info=None, *, loop=None):
     """Create, bind and connect one socket."""
     loop = loop or asyncio.get_event_loop()
     family, type_, proto, _, address = addr_info
     sock = socket.socket(family=family, type=type_, proto=proto)
     try:
         sock.setblocking(False)
-        if local_addr_infos is not None:
-            bind_exceptions = []
-            for _, _, _, _, laddr in local_addr_infos:
-                try:
-                    sock.bind(laddr)
-                    break
-                except OSError as e:
-                    bind_exceptions.append(e)
-            else:  # all bind attempts failed
-                if len(bind_exceptions) == 1:
-                    raise bind_exceptions[0]
-                else:
-                    raise OSError(
-                        'Binding to local address(es) failed: {}'.format(
-                            ', '.join(str(exc) for exc in bind_exceptions)))
+        if local_addr_info is not None:
+            laddr = local_addr_info[4]
+            try:
+                sock.bind(laddr)
+            except OSError as e:
+                raise OSError(
+                    e.errno,
+                    f'error while attempting to bind on address {laddr!r}: '
+                    f'{e.strerror.lower()}')
         await loop.sock_connect(sock, address)
         return sock
     except:
@@ -162,6 +156,7 @@ async def create_connected_sock(
         proto: int = 0,
         flags: int = 0,
         local_addr: Optional[Tuple] = None,
+        local_addrs: Optional[Iterable[Tuple]] = None,
         delay: Optional[float] = _DEFAULT_DELAY,
         interleave: int = 1,
         loop: Optional[asyncio.AbstractEventLoop] = None,
@@ -183,8 +178,10 @@ async def create_connected_sock(
     already sorted according to OS's preferences.)
 
     Most of the arguments should be familiar from the various ``socket`` and
-    ``asyncio`` methods. *delay* and *interleave* control
-    Happy Eyeballs-specific behavior.
+    ``asyncio`` methods.
+    *delay* and *interleave* control Happy Eyeballs-specific behavior.
+    *local_addrs* is a new argument providing new features not specific to
+    Happy Eyeballs.
 
     Args:
         host: Host name to connect to. Unlike ``asyncio.create_connection()``
@@ -208,6 +205,11 @@ async def create_connected_sock(
             locally. The *local_host* and *local_port* are looked up using
             getaddrinfo() if necessary, similarly to *host* and *port*.
 
+        local_addrs: An iterable of (local_host, local_port) tuples, all of
+            which are candidates for locally binding the socket to. This allows
+            e.g. providing one IPv4 and one IPv6 address. Addresses are looked
+            up using getaddrinfo() if necessary.
+
         delay: Amount of time to wait before making connections to different
             addresses. This is the "Connect Attempt Delay" as defined in
             RFC8305.
@@ -226,37 +228,48 @@ async def create_connected_sock(
     """
     loop = loop or asyncio.get_event_loop()
 
+    if local_addr is not None and local_addrs is not None:
+        raise ValueError(
+            'local_addr and local_addrs cannot be specified at the same time')
+
     remote_addrinfos_task = loop.create_task(_ensure_resolved(
         (host, port), family=family, type_=socket.SOCK_STREAM, proto=proto,
         flags=flags, loop=loop))
-    resolve_tasks = [remote_addrinfos_task]
-    if local_addr is not None:
-        local_addrinfos_task = loop.create_task(_ensure_resolved(
-            local_addr, family=family, type_=socket.SOCK_STREAM, proto=proto,
-            flags=flags, loop=loop))
-        resolve_tasks.append(local_addrinfos_task)
+    if local_addrs is None and local_addr is not None:
+        local_addrs = [local_addr]
+    if local_addrs is not None:
+        local_resolve_tasks = [loop.create_task(_ensure_resolved(
+            la, family=family, type_=socket.SOCK_STREAM, proto=proto,
+            flags=flags, loop=loop)) for la in local_addrs]
     else:
-        local_addrinfos_task = None
+        local_resolve_tasks = []
 
     # Use gather() instead of wait() to make sure cancellation propagates in
-    await asyncio.gather(*resolve_tasks, loop=loop)
+    await asyncio.gather(remote_addrinfos_task, *local_resolve_tasks, loop=loop)
 
     addrinfos = remote_addrinfos_task.result()
     if not addrinfos:
         raise OSError('getaddrinfo() returned empty list')
-    if local_addrinfos_task is not None:
-        local_addrinfos = local_addrinfos_task.result()
+    if local_resolve_tasks:
+        local_addrinfos = [lai
+                           for t in local_resolve_tasks
+                           for lai in t.result()]
         if not local_addrinfos:
             raise OSError('getaddrinfo() returned empty list')
     else:
-        local_addrinfos = None
+        local_addrinfos = [None]
 
     if interleave:
         addrinfos = _interleave_addrinfos(addrinfos, interleave)
 
+    # Use a separate task for each (remote_addr, local_addr) pair. When
+    # multiple local addresses are specified, this depends on the OS quickly
+    # failing address combinations that don't work (e.g. an IPv6 remote
+    # address with an IPv4 local address). If your OS can't figure that out,
+    # it's probably time to get a better OS.
     winner_socket, _, exceptions = await staggered_race(
-        (partial(_connect_sock, ai, local_addrinfos, loop=loop)
-         for ai in addrinfos),
+        (partial(_connect_sock, ai, lai, loop=loop)
+         for ai, lai in product(addrinfos, local_addrinfos)),
         delay,
         loop=loop)
     if winner_socket:
@@ -284,6 +297,7 @@ async def create_connection(
         proto: int = 0,
         flags: int = 0,
         local_addr: Optional[Tuple] = None,
+        local_addrs: Optional[Iterable[Tuple]] = None,
         server_hostname=None,
         delay: Optional[float] = _DEFAULT_DELAY,
         interleave: int = 1,
@@ -309,7 +323,8 @@ async def create_connection(
 
     sock = await create_connected_sock(
         host, port, family=family, proto=proto, flags=flags,
-        local_addr=local_addr, delay=delay, interleave=interleave, loop=loop)
+        local_addr=local_addr, local_addrs=local_addrs,
+        delay=delay, interleave=interleave, loop=loop)
 
     try:
         # Defer to the event loop to create transport and protocol
