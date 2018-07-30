@@ -299,6 +299,7 @@ async def create_connection(
         local_addr: Optional[Tuple] = None,
         local_addrs: Optional[Iterable[Tuple]] = None,
         server_hostname=None,
+        ssl_handshake_timeout=None,
         delay: Optional[float] = _DEFAULT_DELAY,
         interleave: int = 1,
         loop: Optional[asyncio.AbstractEventLoop] = None,
@@ -320,6 +321,8 @@ async def create_connection(
         raise ValueError('server_hostname is only meaningful with ssl')
     if server_hostname is None and ssl:
         server_hostname = host
+    if ssl_handshake_timeout is not None and not ssl:
+        raise ValueError('ssl_handshake_timeout is only meaningful with ssl')
 
     sock = await create_connected_sock(
         host, port, family=family, proto=proto, flags=flags,
