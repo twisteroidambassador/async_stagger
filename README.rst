@@ -55,14 +55,17 @@ What does ``async_stagger`` has to offer?
 
 ``async_stagger`` provides ``open_connection`` and
 ``create_connection`` with Happy Eyeballs support. They are mostly drop-in
-replacements for their ``asyncio`` counterparts (Well, not exactly:
-``create_connection`` takes
-a *loop* argument instead of being a method on an event loop). There
-are two additional optional arguments, *delay* and *interleave*, that can be
-left at default for most purposes.
-
+replacements for their ``asyncio`` counterparts, and support most existing
+arguments.
+(There are small differences: ``create_connection`` takes
+a *loop* argument instead of being a method on an event loop.
+Also, these two methods do not support the *sock* argument.)
 Another public coroutine ``create_connected_sock`` returns a connected
-``socket.socket`` object, for when you want lower level access.
+``socket.socket`` object.
+
+These methods support additional optional arguments: *delay* and *interleave*
+control Happy Eyeballs behavior, and *local_addrs* allows specifying multiple
+local addresses to bind to. Check the documentation for details.
 
 
 Happy Eyeballs sounds great! I want to use similar logic somewhere else!
@@ -86,9 +89,6 @@ logic as a reusable block: ``staggered_race``. It can be use when:
 
 Where can I get it?
 -------------------
-
-(At the time I'm writing this README, none of the links below are live yet.
-Hopefully I remember to check them.)
 
 ``async_stagger`` requires Python 3.6 or later. (It doesn't work on Python 3.5
 for a somewhat trivial reason: trailing commas in function definition argument
