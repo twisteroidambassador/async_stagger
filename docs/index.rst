@@ -4,20 +4,27 @@
    contain the root `toctree` directive.
 
 Welcome to async_stagger's documentation!
-=========================================
+#########################################
 
 Project home page: https://github.com/twisteroidambassador/async_stagger
+
+Check out the project's README file linked below for the elevator pitch.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
    self
+   Project README file<readme_link>
    reference
 
 
+Quick Start
+===========
+
+
 Installation
-============
+------------
 
 Install through PyPI as usual:
 
@@ -32,20 +39,21 @@ issue9232_, and some trailing commas in function definition argument lists.)
 
 
 Making TCP connections using Happy Eyeballs
-===========================================
+-------------------------------------------
 
-In practice, you will probably use the two drop-in replacements for ``asyncio``
-functions, :func:`async_stagger.create_connection` and
-:func:`async_stagger.open_connection`. They take pretty much the same arguments
-as their ``asyncio`` counterparts.
+To quickly get the benefit of Happy Eyeballs, simply use
+:func:`async_stagger.create_connection` and
+:func:`async_stagger.open_connection` where you would use their ``asyncio``
+counterparts. Modifications required are minimal, since they support all the
+usual arguments except *sock*, and all new arguments are optional and have
+sane defaults.
 
-Most of the arguments are explained in detail in the reference of
-:func:`async_stagger.create_connected_sock`, though, so you may want to look
-at that entry as well.
+Alternatively, use :func:`async_stagger.create_connected_sock` to create a
+connected ``socket.socket`` object, and use it as you wish.
 
 
 Using the underlying scheduling logic
-=====================================
+-------------------------------------
 
 The Happy Eyeballs scheduling logic, i.e. "run coroutines with staggered start
 times, wait for one to complete, cancel all others", is exposed in a reusable
