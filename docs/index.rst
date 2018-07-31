@@ -8,15 +8,18 @@ Welcome to async_stagger's documentation!
 
 Project home page: https://github.com/twisteroidambassador/async_stagger
 
-Check out the project's README file linked below for the elevator pitch.
+Check out the :doc:`project's README file<readme_link>` for the elevator pitch.
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: Contents of the documentation:
 
    self
    Project README file<readme_link>
    reference
+
+
+.. contents:: Contents of this page
 
 
 Quick Start
