@@ -17,6 +17,7 @@ Check out the :doc:`project's README file<readme_link>` for the elevator pitch.
    self
    Project README file<readme_link>
    reference
+   changelog
 
 
 .. contents:: Contents of this page

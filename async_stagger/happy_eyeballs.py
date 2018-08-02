@@ -230,6 +230,10 @@ async def create_connected_sock(
 
     Returns:
         The connected ``socket.socket`` object.
+
+
+    .. versionadded:: v0.1.3
+       the ``local_addrs`` parameter.
     """
     loop = loop or asyncio.get_event_loop()
 
