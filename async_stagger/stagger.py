@@ -1,14 +1,21 @@
+"""Contains the core scheduling logic for Happy Eyeballs.
+
+staggered_race is also imported into the base package for convenience.
+"""
+
 import asyncio
-
 from contextlib import suppress
-from typing import Iterable, Callable, Any, Tuple, List, Optional
+from typing import (
+    Callable, Any, Tuple, List, Optional, AsyncIterable, Awaitable
+)
 
+from . import aitertools
 
 __all__ = ['staggered_race']
 
 
 async def staggered_race(
-        coro_fns: Iterable[Callable[[], Any]],
+        coro_fns: AsyncIterable[Callable[[], Awaitable]],
         delay: Optional[float],
         *,
         loop: asyncio.AbstractEventLoop = None,
@@ -19,12 +26,12 @@ async def staggered_race(
 ]:
     """Run coroutines with staggered start times and take the first to finish.
 
-    This method takes an iterable of coroutine functions. The first one is
-    started immediately. From then on, whenever the immediately preceding one
-    fails (raises an exception), or when *delay* seconds has passed, the next
-    coroutine is started. This continues until one of the coroutines complete
-    successfully, in which case all others are cancelled, or until all
-    coroutines fail.
+    This function takes an async iterable of coroutine functions. The first one
+    is retrieved and started immediately. From then on, whenever the
+    immediately preceding one fails (raises an exception), or when *delay*
+    seconds has passed, the next coroutine is retrieved and started. This
+    continues until one of the coroutines complete successfully, in which
+    case all others are cancelled, or until all coroutines fail.
 
     The coroutines provided should be well-behaved in the following way:
 
@@ -41,9 +48,11 @@ async def staggered_race(
             raise
 
     Args:
-        coro_fns: an iterable of coroutine functions, i.e. callables that
-            return a coroutine object when called. Use ``functools.partial`` or
-            lambdas to pass arguments.
+        coro_fns: an async iterable of coroutine functions, i.e. callables that
+            return a coroutine object when called.
+            Use :func:`functools.partial` or lambdas to pass arguments.
+            If you want to use a regular iterable here, wrap it with
+            :func:`~aitertools.aiter_from_iter`.
 
         delay: amount of time, in seconds, between starting coroutines. If
             ``None``, the coroutines will run sequentially.
@@ -66,17 +75,22 @@ async def staggered_race(
           started, and the order is the same as in ``coro_fns``. The winning
           coroutine's entry is ``None``.
 
+    .. versionchanged:: v0.2.0
+       *coro_fns* argument now takes an async iterable instead of a regular
+       iterable.
+
     """
-    # TODO: When Python 3.7 arrives with built-in aiter() and anext(), allow
-    # TODO: async iterables in coro_fns.
     loop = loop or asyncio.get_event_loop()
-    enum_coro_fns = enumerate(coro_fns)
+    aiter_coro_fns = aitertools.aiter(coro_fns)
     winner_result = None
     winner_index = None
     exceptions = []
     tasks = []
 
-    async def run_one_coro(previous_failed: Optional[asyncio.Event]) -> None:
+    async def run_one_coro(
+            previous_failed: Optional[asyncio.Event],
+            this_index: int = 0,
+    ) -> None:
         # Wait for the previous task to finish, or for delay seconds
         if previous_failed is not None:
             with suppress(asyncio.TimeoutError):
@@ -87,12 +101,12 @@ async def staggered_race(
                 await asyncio.wait_for(previous_failed.wait(), delay)
         # Get the next coroutine to run
         try:
-            this_index, coro_fn = next(enum_coro_fns)
-        except StopIteration:
+            coro_fn = await aitertools.anext(aiter_coro_fns)
+        except StopAsyncIteration:
             return
         # Start task that will run the next coroutine
         this_failed = asyncio.Event()
-        next_task = loop.create_task(run_one_coro(this_failed))
+        next_task = loop.create_task(run_one_coro(this_failed, this_index+1))
         tasks.append(next_task)
         assert len(tasks) == this_index + 2
         # Prepare place to put this coroutine's exceptions if not won

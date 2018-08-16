@@ -11,6 +11,7 @@ from itertools import count
 import pytest
 
 from .stagger import staggered_race
+from .aitertools import aiter_from_iter
 
 
 @pytest.mark.asyncio
@@ -30,8 +31,9 @@ async def random_tasks():
             print('Coroutine %d raising RuntimeError' % index)
             raise RuntimeError
 
-    coro_fns = [partial(one_coro, i, random.random() * 2, random.random() < 0.8)
-                for i in range(10)]
+    coro_fns = aiter_from_iter(
+        partial(one_coro, i, random.random() * 2, random.random() < 0.8)
+        for i in range(10))
     delay = 0.3
     winner_result, winner_idx, exc = await staggered_race(coro_fns, delay)
     if winner_idx is not None:
@@ -66,7 +68,7 @@ async def infinite_coros():
         for i in count():
             yield partial(one_coro, i, random.random(), random.random() > 0.9)
 
-    print(await staggered_race(coros_gen(), 0.1))
+    print(await staggered_race(aiter_from_iter(coros_gen()), 0.1))
 
 
 @pytest.mark.asyncio
@@ -76,7 +78,8 @@ async def test_stagger_simultaneous_done():
 
 
 async def simultaneous_done():
-    coro_fns = [partial(asyncio.sleep, i*0.2) for i in range(5, 0, -1)]
+    coro_fns = aiter_from_iter(
+        partial(asyncio.sleep, i*0.2) for i in range(5, 0, -1))
     winner_result, winner_idx, exceptions = await staggered_race(coro_fns, 0.2)
     assert winner_idx is not None
     assert all(isinstance(e, asyncio.CancelledError)
@@ -99,7 +102,7 @@ async def no_delay():
             raise RuntimeError
 
     decisions = [random.random()>0.8 for _ in range(10)]
-    coro_fns = [partial(sleeper, 0.1, d) for d in decisions]
+    coro_fns = aiter_from_iter(partial(sleeper, 0.1, d) for d in decisions)
     winner_result, winner_idx, exceptions = await staggered_race(coro_fns, None)
     if winner_idx is not None:
         assert all(not d for d in decisions[:winner_idx])

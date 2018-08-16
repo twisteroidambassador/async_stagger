@@ -90,17 +90,20 @@ logic as a reusable block: ``staggered_race``. It can be use when:
 Where can I get it?
 -------------------
 
-``async_stagger`` requires Python 3.6 or later. (It doesn't work on Python 3.5
-for a somewhat trivial reason: trailing commas in function definition argument
-lists. If those pesky commas are removed, the code should probably run well
-enough.)
-It does not have any external
-dependencies. Install it from PyPI the usual way::
+``async_stagger`` requires Python 3.6 or later.
+(v0.2.0 onwards uses more new features in 3.6 such as async generators and
+async comprehensions, so it will probably require more than cosmetic changes
+to make it run on 3.5.)
+It does not have any external dependencies.
+Install it from PyPI the usual way::
 
     pip install async-stagger
 
 The documentation can be found here:
 http://async-stagger.readthedocs.io/en/latest/
+
+This project is under active development, and APIs may change in the future.
+Check out the Changelog in the documentation.
 
 This project is licensed under the MIT license.
 

@@ -36,10 +36,7 @@ Install through PyPI as usual:
 
    pip install async-stagger
 
-Python 3.6 or above is required. (Python 3.5 would have worked, if not for
-issue9232_, and some trailing commas in function definition argument lists.)
-
-.. _issue9232: https://bugs.python.org/issue9232
+Python 3.6 or above is required.
 
 
 Making TCP connections using Happy Eyeballs
