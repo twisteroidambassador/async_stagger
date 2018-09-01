@@ -55,7 +55,7 @@ async def create_connected_sock(
         interleave: int = 1,
         loop: asyncio.AbstractEventLoop = None,
 ) -> socket.socket:
-    """Connect to (host, port) and return a connected socket.
+    """Connect to *(host, port)* and return a connected socket.
 
     This function implements :rfc:`6555` Happy Eyeballs and some features of
     :rfc:`8305` Happy Eyeballs v2. When a host name resolves to multiple IP

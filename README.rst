@@ -108,6 +108,25 @@ Check out the Changelog in the documentation.
 This project is licensed under the MIT license.
 
 
+Miscellaneous Remarks
+=====================
+
+I have implemented Happy Eyeballs-like algorithms in some of my other projects,
+and this module reflects the things I have learned. However I have yet to
+eat my own dog food and actually import this module from those other projects.
+I would love to hear people's experience using this module in real world
+conditions.
+
+`bpo-31861 <https://bugs.python.org/issue31861>` talks about adding native
+``aiter`` and ``anext`` functions either as builtins or to the ``operator``
+module. Well, I want them NAO!!!one!!!eleventy!! So I borrowed the
+implementations from that bpo and put them in the ``aitertools`` submodule.
+I have only kept the one-argument forms; In particular, the two-argument
+``iter`` function is so disparate from the one-argument version, that I don't
+think they belong to the same function at all, and there really shouldn't be
+a need for ``aiter`` to emulate that behavior.
+
+
 Acknowledgments
 ===============
 
