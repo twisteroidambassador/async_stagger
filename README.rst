@@ -115,7 +115,7 @@ eat my own dog food and actually import this module from those other projects.
 I would love to hear people's experience using this module in real world
 conditions.
 
-`bpo-31861 <https://bugs.python.org/issue31861>` talks about adding native
+`bpo-31861 <https://bugs.python.org/issue31861>`_ talks about adding native
 ``aiter`` and ``anext`` functions either as builtins or to the ``operator``
 module. Well, I want them NAO!!!one!!!eleventy!! So I borrowed the
 implementations from that bpo and put them in the ``aitertools`` submodule.
