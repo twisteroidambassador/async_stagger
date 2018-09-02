@@ -181,8 +181,8 @@ async def builtin_resolver(
     async iterable. Nothing spectacular.
     """
     loop = loop or asyncio.get_event_loop()
-    addrinfos = await _getaddrinfo_raise_on_empty(
-        host, port, family=family, type_=type_,
+    addrinfos = await _ensure_resolved(
+        (host, port), family=family, type_=type_,
         proto=proto, flags=flags, loop=loop)
     addrinfos = _interleave_addrinfos(addrinfos, first_addr_family_count)
     # it would be nice if "yield from addrinfos" worked, but alas,
