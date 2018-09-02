@@ -171,7 +171,7 @@ async def builtin_resolver(
         host,
         port,
         *,
-        family: int = 0,
+        family: int = socket.AF_UNSPEC,
         type_: int = 0,
         proto: int = 0,
         flags: int = 0,
@@ -196,7 +196,7 @@ async def builtin_resolver(
 
 async def ensure_multiple_addrs_resolved(
         addresses: List[Tuple],
-        family: int = 0,
+        family: int = socket.AF_UNSPEC,
         type_: int = socket.SOCK_STREAM,
         proto: int = 0,
         flags: int = 0,
