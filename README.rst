@@ -20,14 +20,12 @@ What is Happy Eyeballs, and why should I use it?
 ------------------------------------------------
 
 Happy Eyeballs is an algorithm for establishing TCP connections to destinations
-specified by host names. It is described in `RFC 6555`_ and `RFC 8305`_. The
+specified by host names. It is described in :rfc:`6555` and :rfc:`8305`. The
 primary benefit is that when host name resolution returns multiple addresses,
 and some of the address are unreachable, Happy Eyeballs will establish the
 connection much faster than conventional algorithms. For more information,
 check the `Wikipedia article on Happy Eyeballs`_.
 
-.. _RFC 6555: https://tools.ietf.org/html/rfc6555
-.. _RFC 8305: https://tools.ietf.org/html/rfc8305
 .. _Wikipedia article on Happy Eyeballs: https://en.wikipedia.org/wiki/Happy_Eyeballs
 
 Python's standard library provides several high-level methods of establishing
@@ -117,7 +115,7 @@ eat my own dog food and actually import this module from those other projects.
 I would love to hear people's experience using this module in real world
 conditions.
 
-`bpo-31861 <https://bugs.python.org/issue31861>` talks about adding native
+`bpo-31861 <https://bugs.python.org/issue31861>`_ talks about adding native
 ``aiter`` and ``anext`` functions either as builtins or to the ``operator``
 module. Well, I want them NAO!!!one!!!eleventy!! So I borrowed the
 implementations from that bpo and put them in the ``aitertools`` submodule.

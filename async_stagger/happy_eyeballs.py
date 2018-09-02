@@ -65,7 +65,7 @@ async def create_connected_sock(
     address family is broken (when IPv6 fails, for example), connections
     still complete quickly.
 
-    (Some fancier features specified in RFC8305, like asynchronous DNS
+    (Some fancier features specified in :rfc:`8305`, like asynchronous DNS
     queries, statefulness, and features related to NAT64 and DNS64 are not
     implemented. Destination address sorting is left for the operating
     system; it is assumed that the addresses returned by
