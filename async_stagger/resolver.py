@@ -18,6 +18,9 @@ from typing import AsyncIterator, Tuple, Iterable, List, Optional
 from .typing import AddrInfoType, HostType, PortType
 
 
+RESOLUTION_DELAY = 0.05  # seconds
+FIRST_ADDRESS_FAMILY_COUNT = 1
+
 _HAS_IPv6 = hasattr(socket, 'AF_INET6')
 
 
@@ -172,7 +175,7 @@ async def builtin_resolver(
         type_: int = 0,
         proto: int = 0,
         flags: int = 0,
-        first_addr_family_count: int = 1,
+        first_addr_family_count: int = FIRST_ADDRESS_FAMILY_COUNT,
         loop: asyncio.AbstractEventLoop = None,
 ) -> AsyncIterator[AddrInfoType]:
     """Resolver using built-in getaddrinfo().
