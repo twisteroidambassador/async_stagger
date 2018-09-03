@@ -13,7 +13,7 @@ import asyncio
 import collections
 import itertools
 import socket
-from typing import AsyncIterator, Tuple, Iterable, List, Optional
+from typing import AsyncIterator, Tuple, Iterable, List, Optional, Iterator
 
 from .typing import AddrInfoType, HostType, PortType
 
@@ -141,6 +141,13 @@ async def _ensure_resolved(
             proto=proto, flags=flags, loop=loop)
 
 
+def _roundrobin(*iters: Iterable) -> Iterator:
+    # Note: iters should not contain None
+    return (a for a in itertools.chain.from_iterable(
+                itertools.zip_longest(*iters)
+            ) if a is not None)
+
+
 def _interleave_addrinfos(
         addrinfos: Iterable[AddrInfoType],
         first_address_family_count: int = 1,
@@ -159,11 +166,7 @@ def _interleave_addrinfos(
     if first_address_family_count > 1:
         reordered.extend(addrinfos_lists[0][:first_address_family_count - 1])
         del addrinfos_lists[0][:first_address_family_count - 1]
-    reordered.extend(
-        a for a in itertools.chain.from_iterable(
-            itertools.zip_longest(*addrinfos_lists)
-        ) if a is not None
-    )
+    reordered.extend(_roundrobin(*addrinfos_lists))
     return reordered
 
 
@@ -218,3 +221,121 @@ async def ensure_multiple_addrs_resolved(
     ))
     for addrinfo in itertools.chain.from_iterable(results):
         yield addrinfo
+
+
+def async_builtin_resolver(
+        host,
+        port,
+        *,
+        family: int = socket.AF_UNSPEC,
+        type_: int = 0,
+        proto: int = 0,
+        flags: int = 0,
+        resolution_delay: float = RESOLUTION_DELAY,
+        first_addr_family_count: int = FIRST_ADDRESS_FAMILY_COUNT,
+        loop: asyncio.AbstractEventLoop = None,
+) -> AsyncIterator[AddrInfoType]:
+    """Dispatcher function for async resolver.
+
+    Returns builtin_resolver(...) if family != socket.AF_UNSPEC.
+    """
+    if _HAS_IPv6 and family == socket.AF_UNSPEC:
+        return _async_builtin_resolver(
+            host, port, type_=type_, proto=proto, flags=flags,
+            resolution_delay=resolution_delay,
+            first_addr_family_count=first_addr_family_count, loop=loop)
+    else:
+        return builtin_resolver(
+            host, port, family=family, type_=type_, proto=proto, flags=flags,
+            first_addr_family_count=first_addr_family_count, loop=loop)
+
+
+async def _async_builtin_resolver(
+        host,
+        port,
+        *,
+        type_: int = 0,
+        proto: int = 0,
+        flags: int = 0,
+        resolution_delay: float = RESOLUTION_DELAY,
+        first_addr_family_count: int = FIRST_ADDRESS_FAMILY_COUNT,
+        loop: asyncio.AbstractEventLoop = None,
+) -> AsyncIterator[AddrInfoType]:
+    loop = loop or asyncio.get_event_loop()
+
+    # Determine whether host is an IP address literal
+    addrinfos = _ipaddr_info(host, port, socket.AF_UNSPEC, type_, proto)
+    if addrinfos is not None:
+        for addrinfo in addrinfos:
+            yield addrinfo
+        return
+
+    # These two deques will be changed by the resolve tasks, assume they will
+    # change during any "await"
+    v6_infos = collections.deque()
+    v4_infos = collections.deque()
+
+    async def resolve_ipv6():
+        v6_infos.extend(await _getaddrinfo_raise_on_empty(
+            host, port, family=socket.AF_INET6,
+            type_=type_, proto=proto, flags=flags, loop=loop))
+
+    v6_resolve_task = loop.create_task(resolve_ipv6())
+
+    async def resolve_ipv4():
+        infos = await _getaddrinfo_raise_on_empty(
+            host, port, family=socket.AF_INET,
+            type_=type_, proto=proto, flags=flags, loop=loop)
+        if not v6_resolve_task.done():
+            await asyncio.wait((v6_resolve_task,), timeout=resolution_delay)
+        v4_infos.extend(infos)
+
+    v4_resolve_task = loop.create_task(resolve_ipv4())
+    pending = {v6_resolve_task, v4_resolve_task}
+
+    extra_v6_addrs_to_yield = first_addr_family_count - 1
+    next_should_yield_v6 = True
+    has_yielded = False
+
+    try:
+        while True:
+            # If there's nothing to yield:
+            if not v6_infos and not v4_infos:
+                # And both resolve tasks are done, we are either done or failed
+                if not pending:
+                    assert v6_resolve_task.done()
+                    assert v4_resolve_task.done()
+                    if has_yielded:
+                        return
+                    raise OSError(
+                        f'Address resolution failed, '
+                        f'IPv6: <{v6_resolve_task.exception()!r}>, '
+                        f'IPv4: <{v4_resolve_task.exception()!r}>')
+                # Resolve tasks are not done, wait for one and try again
+                done, pending = await asyncio.wait(
+                    pending, return_when=asyncio.FIRST_COMPLETED)
+                # "Consume" any exception
+                for d in done:
+                    d.exception()
+                continue
+            # There's something to yield, determine which
+            if next_should_yield_v6:
+                yield_v6 = bool(v6_infos)
+            else:
+                yield_v6 = not v4_infos
+            # Actually yield the thing,
+            # also determine what should be yielded next time
+            if yield_v6:
+                yield v6_infos.popleft()
+                if extra_v6_addrs_to_yield > 0:
+                    extra_v6_addrs_to_yield -= 1
+                    next_should_yield_v6 = True
+                else:
+                    next_should_yield_v6 = False
+            else:
+                yield v4_infos.popleft()
+                next_should_yield_v6 = True
+            has_yielded = True
+    finally:
+        v6_resolve_task.cancel()
+        v4_resolve_task.cancel()
