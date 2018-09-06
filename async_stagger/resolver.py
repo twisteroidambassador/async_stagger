@@ -301,16 +301,8 @@ async def _async_builtin_resolver(
         while True:
             # If there's nothing to yield:
             if not v6_infos and not v4_infos:
-                # And both resolve tasks are done, we are either done or failed
                 if not pending:
-                    assert v6_resolve_task.done()
-                    assert v4_resolve_task.done()
-                    if has_yielded:
-                        return
-                    raise OSError(
-                        f'Address resolution failed, '
-                        f'IPv6: <{v6_resolve_task.exception()!r}>, '
-                        f'IPv4: <{v4_resolve_task.exception()!r}>')
+                    break
                 # Resolve tasks are not done, wait for one and try again
                 done, pending = await asyncio.wait(
                     pending, return_when=asyncio.FIRST_COMPLETED)
@@ -318,24 +310,35 @@ async def _async_builtin_resolver(
                 for d in done:
                     d.exception()
                 continue
-            # There's something to yield, determine which
-            if next_should_yield_v6:
-                yield_v6 = bool(v6_infos)
-            else:
-                yield_v6 = not v4_infos
-            # Actually yield the thing,
-            # also determine what should be yielded next time
-            if yield_v6:
-                yield v6_infos.popleft()
-                if extra_v6_addrs_to_yield > 0:
+            # There's something to yield
+            if extra_v6_addrs_to_yield > 0:
+                # Always try to yield IPv6 address if available
+                assert next_should_yield_v6
+                if v6_infos:
+                    yield v6_infos.popleft()
                     extra_v6_addrs_to_yield -= 1
-                    next_should_yield_v6 = True
                 else:
-                    next_should_yield_v6 = False
+                    yield v4_infos.popleft()
             else:
-                yield v4_infos.popleft()
-                next_should_yield_v6 = True
+                # Alternate between IPv6 and IPv4
+                if ((next_should_yield_v6 and v6_infos)
+                        or (not next_should_yield_v6 and not v4_infos)):
+                    yield v6_infos.popleft()
+                    next_should_yield_v6 = False
+                else:
+                    yield v4_infos.popleft()
+                    next_should_yield_v6 = True
             has_yielded = True
+
+        assert v6_resolve_task.done()
+        assert v4_resolve_task.done()
+        if has_yielded:
+            return
+
+        raise OSError(
+            f'Address resolution failed, '
+            f'IPv6: <{v6_resolve_task.exception()!r}>, '
+            f'IPv4: <{v4_resolve_task.exception()!r}>')
     finally:
         v6_resolve_task.cancel()
         v4_resolve_task.cancel()
