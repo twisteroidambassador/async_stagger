@@ -16,7 +16,7 @@ import socket
 from typing import AsyncIterator, Tuple, Iterable, List, Optional, Iterator
 
 from .typing import AddrInfoType, HostType, PortType
-from .defaults import RESOLUTION_DELAY, FIRST_ADDRESS_FAMILY_COUNT
+from .constants import RESOLUTION_DELAY, FIRST_ADDRESS_FAMILY_COUNT
 
 
 _HAS_IPv6 = hasattr(socket, 'AF_INET6')
