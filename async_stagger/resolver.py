@@ -261,6 +261,12 @@ async def _async_builtin_resolver(
         first_addr_family_count: int = FIRST_ADDRESS_FAMILY_COUNT,
         loop: asyncio.AbstractEventLoop = None,
 ) -> AsyncIterator[AddrInfoType]:
+    """Asynchronous resolver using built-in getaddrinfo().
+
+    "Asynchronous" means that IPv6 and IPv4 resolutions are done separately
+    in parallel, and addresses can be yielded as soon as either address family
+    finished resolving. The behavior is detailed in :rfc:`8305#section-3`.
+    """
     loop = loop or asyncio.get_event_loop()
 
     # Determine whether host is an IP address literal
