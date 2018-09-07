@@ -16,10 +16,8 @@ import socket
 from typing import AsyncIterator, Tuple, Iterable, List, Optional, Iterator
 
 from .typing import AddrInfoType, HostType, PortType
+from .defaults import RESOLUTION_DELAY, FIRST_ADDRESS_FAMILY_COUNT
 
-
-RESOLUTION_DELAY = 0.05  # seconds
-FIRST_ADDRESS_FAMILY_COUNT = 1
 
 _HAS_IPv6 = hasattr(socket, 'AF_INET6')
 
@@ -28,7 +26,7 @@ async def _getaddrinfo_raise_on_empty(
         host: HostType,
         port: PortType,
         *,
-        family: int = 0,
+        family: int = socket.AF_UNSPEC,
         type_: int = 0,
         proto: int = 0,
         flags: int = 0,
@@ -122,8 +120,8 @@ def _ipaddr_info(
 async def _ensure_resolved(
         address: Tuple,
         *,
-        family: int = 0,
-        type_: int = socket.SOCK_STREAM,
+        family: int = socket.AF_UNSPEC,
+        type_: int = 0,
         proto: int = 0,
         flags: int = 0,
         loop: asyncio.AbstractEventLoop = None,
@@ -150,7 +148,7 @@ def _roundrobin(*iters: Iterable) -> Iterator:
 
 def _interleave_addrinfos(
         addrinfos: Iterable[AddrInfoType],
-        first_address_family_count: int = 1,
+        first_address_family_count: int,
 ) -> List[AddrInfoType]:
     """Interleave list of addrinfo tuples by family."""
     # Group addresses by family
@@ -186,6 +184,8 @@ async def builtin_resolver(
     Interleaves addresses by family if required, and yield results as an
     async iterable. Nothing spectacular.
     """
+    if first_addr_family_count is None:
+        first_addr_family_count = FIRST_ADDRESS_FAMILY_COUNT
     loop = loop or asyncio.get_event_loop()
     addrinfos = await _ensure_resolved(
         (host, port), family=family, type_=type_,
@@ -200,7 +200,7 @@ async def builtin_resolver(
 async def ensure_multiple_addrs_resolved(
         addresses: List[Tuple],
         family: int = socket.AF_UNSPEC,
-        type_: int = socket.SOCK_STREAM,
+        type_: int = 0,
         proto: int = 0,
         flags: int = 0,
         loop: asyncio.AbstractEventLoop = None,

@@ -7,11 +7,9 @@ from . import aitertools
 from . import resolver
 from .stagger import staggered_race
 from .typing import AddrInfoType, HostType, PortType
+from .constants import CONNECT_DELAY, FIRST_ADDRESS_FAMILY_COUNT
 
 __all__ = ['create_connected_sock', 'create_connection', 'open_connection']
-
-_DEFAULT_DELAY = 0.3
-_DEFAULT_LIMIT = 2 ** 16
 
 
 async def _connect_sock(
@@ -51,8 +49,8 @@ async def create_connected_sock(
         flags: int = 0,
         local_addr: Tuple = None,
         local_addrs: Iterable[Tuple] = None,
-        delay: Optional[float] = _DEFAULT_DELAY,
-        interleave: int = 1,
+        delay: Optional[float] = CONNECT_DELAY,
+        interleave: int = FIRST_ADDRESS_FAMILY_COUNT,
         loop: asyncio.AbstractEventLoop = None,
 ) -> socket.socket:
     """Connect to *(host, port)* and return a connected socket.
@@ -180,22 +178,17 @@ async def create_connected_sock(
             ', '.join(str(exc) for exc in exceptions)))
 
 
+create_connected_sock_kwds = tuple(
+    create_connected_sock.__kwdefaults__.keys())
+
+
 async def create_connection(
         protocol_factory: Callable[[], asyncio.Protocol],
         host: HostType,
         port: PortType,
         *,
-        ssl=None,
-        family: int = socket.AF_UNSPEC,
-        proto: int = 0,
-        flags: int = 0,
-        local_addr: Tuple = None,
-        local_addrs: Iterable[Tuple] = None,
-        server_hostname=None,
-        ssl_handshake_timeout=None,
-        delay: Optional[float] = _DEFAULT_DELAY,
-        interleave: int = 1,
         loop: asyncio.AbstractEventLoop = None,
+        **kwargs,
 ) -> Tuple[asyncio.Transport, asyncio.Protocol]:
     """Connect to *(host, port)* and return *(transport, protocol)*.
 
@@ -212,24 +205,28 @@ async def create_connection(
         :meth:`asyncio.AbstractEventLoop.create_connection`.
     """
     loop = loop or asyncio.get_event_loop()
-    # These checks are copied from BaseEventLoop.create_connection()
-    if server_hostname is not None and not ssl:
-        raise ValueError('server_hostname is only meaningful with ssl')
-    if server_hostname is None and ssl:
-        server_hostname = host
-    if ssl_handshake_timeout is not None and not ssl:
-        raise ValueError('ssl_handshake_timeout is only meaningful with ssl')
+    # To avoid the trouble of synchronizing this function's argument list
+    # to create_connected_sock, the keyword arguments meant for
+    # create_connected_sock are extracted dynamically.
+    create_connected_sock_kwargs = {}
+    create_connected_sock_kwargs.update(
+        (arg, kwargs.pop(arg)) for arg in create_connected_sock_kwds
+        if arg in kwargs
+    )
+    # The remaining keyword arguments are sent to loop.create_connection.
+    # This way, this function stays compatible with different versions of
+    # Python even if new keyword arguments are added to loop.create_connection.
+    # In unfortunate cases where invalid keyword arguments are passed, the
+    # socket object will be created first, then the call to
+    # loop.create_connection will fail.
 
     sock = await create_connected_sock(
-        host, port, family=family, proto=proto, flags=flags,
-        local_addr=local_addr, local_addrs=local_addrs,
-        delay=delay, interleave=interleave, loop=loop)
+        host, port, loop=loop, **create_connected_sock_kwargs)
 
     try:
         # Defer to the event loop to create transport and protocol
         return await loop.create_connection(
-            protocol_factory, ssl=ssl, sock=sock,
-            server_hostname=server_hostname)
+            protocol_factory, sock=sock, **kwargs)
     except:
         sock.close()
         raise
@@ -239,7 +236,6 @@ async def open_connection(
         host: HostType,
         port: PortType,
         *,
-        limit: int = _DEFAULT_LIMIT,
         loop: asyncio.AbstractEventLoop = None,
         **kwargs,
 ) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
@@ -255,7 +251,13 @@ async def open_connection(
         *(reader, writer)*, the same as :func:`asyncio.open_connection`.
     """
     loop = loop or asyncio.get_event_loop()
-    reader = asyncio.StreamReader(limit=limit, loop=loop)
+    # Some gymnastics so I do not have to maintain a copy of the default value
+    # for the keyword argument 'limit' for asyncio.open_connection and
+    # asyncio.StreamReader
+    stream_reader_kwargs = {'loop': loop}
+    if 'limit' in kwargs:
+        stream_reader_kwargs['limit'] = kwargs.pop('limit')
+    reader = asyncio.StreamReader(**stream_reader_kwargs)
     protocol = asyncio.StreamReaderProtocol(reader, loop=loop)
     transport, _ = await create_connection(
         lambda: protocol, host, port, loop=loop, **kwargs)
