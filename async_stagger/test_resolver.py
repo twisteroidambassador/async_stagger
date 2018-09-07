@@ -8,6 +8,9 @@ import pytest
 from . import resolver
 
 
+pytestmark = pytest.mark.skipif(
+    not hasattr(socket, 'AF_INET6'), reason='Platform does not support IPv6')
+
 IPV6_ADDRINFOS = [
     (socket.AF_INET6, 0, 0, '', ('2001:db8::1', 1)),
     (socket.AF_INET6, 0, 0, '', ('2001:db8::2', 2)),
