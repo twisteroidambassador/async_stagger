@@ -29,6 +29,6 @@ setup(
     packages=find_packages(),
     python_requires='>=3.6',
     extras_require={
-        'test': ['pytest', 'pytest-asyncio'],
+        'test': ['pytest', 'pytest-asyncio', 'pytest-mock'],
     }
 )

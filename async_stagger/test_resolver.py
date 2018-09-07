@@ -23,6 +23,15 @@ IPV4_ADDRINFOS = [
 ]
 
 
+async def mock_getaddrinfo(host, port, *, family=0, type=0, proto=0, flags=0):
+    if family == socket.AF_INET6:
+        return IPV6_ADDRINFOS
+    elif family == socket.AF_INET:
+        return IPV4_ADDRINFOS
+    else:
+        return IPV6_ADDRINFOS + IPV4_ADDRINFOS
+
+
 async def list_from_aiter(
         aiterable: AsyncIterable,
         delay: float = 0,
@@ -39,6 +48,54 @@ def roundrobin(*iters: Iterable) -> Iterator:
     return (a for a in itertools.chain.from_iterable(
                 itertools.zip_longest(*iters)
             ) if a is not None)
+
+
+@pytest.mark.asyncio
+async def test_builtin_resolver_both(
+        event_loop: asyncio.AbstractEventLoop, mocker):
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+
+    infos = await list_from_aiter(resolver.builtin_resolver('localhost', 80))
+    assert infos == list(roundrobin(IPV6_ADDRINFOS, IPV4_ADDRINFOS))
+
+
+@pytest.mark.asyncio
+async def test_builtin_resolver_fafc(
+        event_loop: asyncio.AbstractEventLoop, mocker):
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+
+    infos = await list_from_aiter(
+        resolver.builtin_resolver('localhost', 80, first_addr_family_count=2))
+    assert infos == [
+        IPV6_ADDRINFOS[0],
+        IPV6_ADDRINFOS[1],
+        IPV4_ADDRINFOS[0],
+        IPV6_ADDRINFOS[2],
+        IPV4_ADDRINFOS[1],
+        IPV6_ADDRINFOS[3],
+        IPV4_ADDRINFOS[2],
+        IPV4_ADDRINFOS[3],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_builtin_resolver_family_af_inet(
+        event_loop: asyncio.AbstractEventLoop, mocker):
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+
+    infos = await list_from_aiter(
+        resolver.builtin_resolver('localhost', 80, family=socket.AF_INET))
+    assert infos == IPV4_ADDRINFOS
+
+
+@pytest.mark.asyncio
+async def test_builtin_resolver_family_af_inet6(
+        event_loop: asyncio.AbstractEventLoop, mocker):
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+
+    infos = await list_from_aiter(
+        resolver.builtin_resolver('localhost', 80, family=socket.AF_INET6),)
+    assert infos == IPV6_ADDRINFOS
 
 
 @pytest.mark.asyncio
@@ -104,14 +161,7 @@ async def test_async_resolver_ipv4_exc(
 @pytest.mark.asyncio
 async def test_async_resolver_both(
         event_loop: asyncio.AbstractEventLoop, mocker):
-
-    async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
-        if family == socket.AF_INET6:
-            return IPV6_ADDRINFOS
-        else:
-            return IPV4_ADDRINFOS
-
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
         resolver.async_builtin_resolver('localhost', 80),
@@ -127,9 +177,11 @@ async def test_async_resolver_ipv6_slightly_slow(
     async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
         if family == socket.AF_INET:
             return IPV4_ADDRINFOS
-        else:
+        elif family == socket.AF_INET6:
             await asyncio.sleep(0.3)
             return IPV6_ADDRINFOS
+        else:
+            raise socket.gaierror
 
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
@@ -147,9 +199,11 @@ async def test_async_resolver_ipv6_very_slow(
     async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
         if family == socket.AF_INET:
             return IPV4_ADDRINFOS
-        else:
-            await asyncio.sleep(0.3)
+        elif family == socket.AF_INET6:
+            await asyncio.sleep(0.15)
             return IPV6_ADDRINFOS
+        else:
+            raise socket.gaierror
 
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
@@ -161,15 +215,17 @@ async def test_async_resolver_ipv6_very_slow(
 
 
 @pytest.mark.asyncio
-async def test_async_resolver_ipv6_very_slow_2(
+async def test_async_resolver_ipv6_extremely_slow(
         event_loop: asyncio.AbstractEventLoop, mocker):
 
     async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
         if family == socket.AF_INET:
             return IPV4_ADDRINFOS
-        else:
+        elif family == socket.AF_INET6:
             await asyncio.sleep(0.3)
             return IPV6_ADDRINFOS
+        else:
+            raise socket.gaierror
 
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
@@ -183,14 +239,7 @@ async def test_async_resolver_ipv6_very_slow_2(
 @pytest.mark.asyncio
 async def test_async_resolver_fafc(
         event_loop: asyncio.AbstractEventLoop, mocker):
-
-    async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
-        if family == socket.AF_INET6:
-            return IPV6_ADDRINFOS
-        else:
-            return IPV4_ADDRINFOS
-
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
         resolver.async_builtin_resolver(
@@ -212,14 +261,7 @@ async def test_async_resolver_fafc(
 @pytest.mark.asyncio
 async def test_async_resolver_family_af_inet(
         event_loop: asyncio.AbstractEventLoop, mocker):
-
-    async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
-        if family == socket.AF_INET6:
-            return IPV6_ADDRINFOS
-        else:
-            return IPV4_ADDRINFOS
-
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
         resolver.async_builtin_resolver('localhost', 80, family=socket.AF_INET),
@@ -231,14 +273,7 @@ async def test_async_resolver_family_af_inet(
 @pytest.mark.asyncio
 async def test_async_resolver_family_af_inet6(
         event_loop: asyncio.AbstractEventLoop, mocker):
-
-    async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
-        if family == socket.AF_INET6:
-            return IPV6_ADDRINFOS
-        else:
-            return IPV4_ADDRINFOS
-
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
         resolver.async_builtin_resolver(
