@@ -225,8 +225,7 @@ async def create_connection(
     # To avoid the trouble of synchronizing this function's argument list
     # to create_connected_sock, the keyword arguments meant for
     # create_connected_sock are extracted dynamically.
-    create_connected_sock_kwargs = {}
-    create_connected_sock_kwargs.update(
+    create_connected_sock_kwargs = dict(
         (arg, kwargs.pop(arg)) for arg in create_connected_sock_kwds
         if arg in kwargs
     )
