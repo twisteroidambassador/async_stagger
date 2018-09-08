@@ -7,7 +7,8 @@ from . import aitertools
 from . import resolver
 from .stagger import staggered_race
 from .typing import AddrInfoType, HostType, PortType
-from .constants import CONNECT_DELAY, FIRST_ADDRESS_FAMILY_COUNT
+from .constants import (
+    CONNECT_DELAY, FIRST_ADDRESS_FAMILY_COUNT, RESOLUTION_DELAY)
 
 __all__ = ['create_connected_sock', 'create_connection', 'open_connection']
 
@@ -51,6 +52,8 @@ async def create_connected_sock(
         local_addrs: Iterable[Tuple] = None,
         delay: Optional[float] = CONNECT_DELAY,
         interleave: int = FIRST_ADDRESS_FAMILY_COUNT,
+        async_dns: bool = False,
+        resolution_delay: float = RESOLUTION_DELAY,
         loop: asyncio.AbstractEventLoop = None,
 ) -> socket.socket:
     """Connect to *(host, port)* and return a connected socket.
@@ -111,14 +114,22 @@ async def create_connected_sock(
             addresses. This is the "Connect Attempt Delay" as defined in
             :rfc:`8305`.
 
-        interleave: Whether to interleave addresses returned by
-            :func:`~asyncio.AbstractEventLoop.getaddrinfo` by address family.
+        interleave: Whether to interleave resolved addresses by address family.
             0 means not to interleave and simply use the returned order.
             An integer >= 1 is interpreted as
             "First Address Family Count" defined in :rfc:`8305`,
             i.e. the reordered list will have this many addresses for the
             first address family,
             and the rest will be interleaved one to one.
+
+        async_dns: Do asynchronous DNS resolution, where IPv6 and IPv4
+            addresses are resolved in parallel, and connection attempts can
+            be made as soon as either address family is resolved. This behavior
+            is described in :rfc:`8305#section-3`.
+
+        resolution_delay: Amount of time to wait for IPv6 addresses to resolve
+            if IPv4 addresses are resolved first. This is the "Resolution
+            Delay" as defined in :rfc:`8305`.
 
         loop: Event loop to use.
 
@@ -135,9 +146,15 @@ async def create_connected_sock(
         raise ValueError(
             'local_addr and local_addrs cannot be specified at the same time')
 
-    remote_addrinfo_aiter = resolver.builtin_resolver(
-        host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
-        flags=flags, first_addr_family_count=interleave, loop=loop)
+    if not async_dns:
+        remote_addrinfo_aiter = resolver.builtin_resolver(
+            host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
+            flags=flags, first_addr_family_count=interleave, loop=loop)
+    else:
+        remote_addrinfo_aiter = resolver.async_builtin_resolver(
+            host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
+            flags=flags, resolution_delay=resolution_delay,
+            first_addr_family_count=interleave, loop=loop)
 
     if local_addrs is None and local_addr is not None:
         local_addrs = [local_addr]

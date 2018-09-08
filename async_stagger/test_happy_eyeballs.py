@@ -211,3 +211,36 @@ async def test_create_connected_sock_bind_order(
 
         s = await happy_eyeballs.create_connected_sock(
             'magic-host', 80, local_addr=('localhost', 0))
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_async_normal(event_loop, mocker):
+    mocker.patch('socket.socket', wraps=MockSocket)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    s = await happy_eyeballs.create_connected_sock(
+        'magic-host', 80, async_dns=True)
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_async_ipv6_resolve_slow(
+        event_loop, mocker):
+
+    async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
+        if family != socket.AF_INET:
+            await asyncio.sleep(1)
+        return await mock_getaddrinfo(
+            host, port, family=family, type=type, proto=proto, flags=flags)
+
+    mocker.patch('socket.socket', wraps=MockSocket)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    start_time = event_loop.time()
+    s = await happy_eyeballs.create_connected_sock(
+        'magic-host', 80, async_dns=True)
+    assert event_loop.time() - start_time < 1
+    assert s._family == socket.AF_INET
