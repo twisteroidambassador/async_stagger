@@ -60,10 +60,12 @@ a *loop* argument instead of being a method on an event loop.
 Also, these two methods do not support the *sock* argument.)
 Another public coroutine ``create_connected_sock`` returns a connected
 ``socket.socket`` object.
+Check the documentation for details.
 
-These methods support additional optional arguments: *delay* and *interleave*
-control Happy Eyeballs behavior, and *local_addrs* allows specifying multiple
-local addresses to bind to. Check the documentation for details.
+These methods implements many features specified in :rfc:`8305` Happy Eyeballs
+v2, which extends and obsoletes :rfc:`6555`. In particular, asynchronous
+address resolution, destination address interleaving by family and staggered
+connection attempts are implemented.
 
 
 Happy Eyeballs sounds great! I want to use similar logic somewhere else!
@@ -108,6 +110,9 @@ This project is licensed under the MIT license.
 
 Miscellaneous Remarks
 =====================
+
+Asynchronous address resolution is added in v0.2.1. With that, I feel that
+the package should be fairly feature-complete.
 
 I have implemented Happy Eyeballs-like algorithms in some of my other projects,
 and this module reflects the things I have learned. However I have yet to

@@ -64,10 +64,11 @@ async def create_connected_sock(
     times, and the one completing fastest is used. The resolved addresses can
     be interleaved by address family, so even if network connectivity for one
     address family is broken (when IPv6 fails, for example), connections
-    still complete quickly.
+    still complete quickly. IPv6 and IPv4 addresses of a hostname can also
+    be resolved in parallel.
 
-    (Some fancier features specified in :rfc:`8305`, like asynchronous DNS
-    queries, statefulness, and features related to NAT64 and DNS64 are not
+    (Some fancier features specified in :rfc:`8305`, like
+    statefulness and features related to NAT64 and DNS64 are not
     implemented. Destination address sorting is left for the operating
     system; it is assumed that the addresses returned by
     :func:`~asyncio.AbstractEventLoop.getaddrinfo` is already sorted
@@ -75,7 +76,8 @@ async def create_connected_sock(
 
     Most of the arguments should be familiar from the various :mod:`socket` and
     :mod:`asyncio` methods.
-    *delay* and *interleave* control Happy Eyeballs-specific behavior.
+    *delay*, *interleave*, *async_dns* and *resolution_delay*
+    control Happy Eyeballs-specific behavior.
     *local_addrs* is a new argument providing new features not specific to
     Happy Eyeballs.
 
@@ -139,6 +141,9 @@ async def create_connected_sock(
 
     .. versionadded:: v0.1.3
        the *local_addrs* parameter.
+
+    .. versionadded:: v0.2.1
+       the *async_dns* and *resolution_delay* parameters.
     """
     loop = loop or asyncio.get_event_loop()
 

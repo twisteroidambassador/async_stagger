@@ -2,6 +2,16 @@ Changelog
 #########
 
 
+v0.2.1
+======
+
+Added support for asynchronous address resolution: IPv6 and IPv4 addresses for
+a hostname can be resolved in parallel, and connection attempts may start
+as soon as either address family is resolved. This reduces time needed for
+connection establishment in cases where resolution for a certain address family
+is slow.
+
+
 v0.2.0
 ======
 
