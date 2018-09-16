@@ -348,3 +348,8 @@ async def _async_builtin_resolver(
     finally:
         v6_resolve_task.cancel()
         v4_resolve_task.cancel()
+        # Some times when running the test suite, there's a warning about
+        # "task destroyed but it is pending" on the resolve_ipv6 task at the
+        # end. I'm not sure what cleanup is required here exactly, but adding
+        # the wait() below doesn't seem to fix it.
+        await asyncio.wait((v6_resolve_task, v4_resolve_task))
