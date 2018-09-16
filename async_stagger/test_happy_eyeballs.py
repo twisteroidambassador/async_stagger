@@ -68,11 +68,16 @@ class MockSocket:
         self.sockname = None
         self.peername = None
         self.blocking = True
+        self.closed = False
 
     def setblocking(self, blocking):
+        if self.closed:
+            raise OSError('socket closed')
         self.blocking = blocking
 
     def bind(self, address):
+        if self.closed:
+            raise OSError('socket closed')
         if self.sockname is not None:
             raise OSError('socket already bound')
         try:
@@ -86,6 +91,8 @@ class MockSocket:
         return
 
     async def async_connect(self, address):
+        if self.closed:
+            raise OSError('socket closed')
         if self.peername is not None:
             raise OSError('socket already connected')
         try:
@@ -97,6 +104,9 @@ class MockSocket:
 
     async def _connect_response(self, address):
         await asyncio.sleep(0.05)
+
+    def close(self):
+        self.closed = True
 
 
 async def mock_loop_sock_connect(sock, address):
@@ -244,3 +254,71 @@ async def test_create_connected_sock_async_ipv6_resolve_slow(
         'magic-host', 80, async_dns=True)
     assert event_loop.time() - start_time < 1
     assert s._family == socket.AF_INET
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_connect_fail_same_exception(
+        event_loop, mocker):
+
+    class MockSocketConnectFail(MockSocket):
+        async def _connect_response(self, address):
+            raise OSError('connect call failed')
+
+    mocker.patch('socket.socket', wraps=MockSocketConnectFail)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    with pytest.raises(OSError) as exc_info:
+        s = await happy_eyeballs.create_connected_sock('magic-host', 80)
+
+    assert exc_info.value.args[0] == 'connect call failed'
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_connect_fail_different_exception(
+        event_loop, mocker):
+
+    class MockSocketConnectFail(MockSocket):
+        def _bind_response(self, address):
+            if address[0] == '::1':
+                raise OSError('bind failed')
+
+        async def _connect_response(self, address):
+            raise OSError('connect call failed')
+
+    mocker.patch('socket.socket', wraps=MockSocketConnectFail)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    with pytest.raises(OSError) as exc_info:
+        s = await happy_eyeballs.create_connected_sock(
+            'magic-host', 80, local_addr=('localhost', 0))
+
+    assert exc_info.value.args[0].startswith('Multiple exceptions: ')
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_connect_fail_detailed_exception(
+        event_loop, mocker):
+
+    class MockSocketConnectFail(MockSocket):
+        def _bind_response(self, address):
+            if address[0] == '::1':
+                raise OSError('bind failed')
+
+        async def _connect_response(self, address):
+            raise OSError('connect call failed')
+
+    mocker.patch('socket.socket', wraps=MockSocketConnectFail)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    with pytest.raises(happy_eyeballs.HappyEyeballsConnectError) as exc_info:
+        s = await happy_eyeballs.create_connected_sock(
+            'magic-host', 80, local_addr=('localhost', 0),
+            detailed_exceptions=True)
+
+    assert len(exc_info.value.args[0]) == 16

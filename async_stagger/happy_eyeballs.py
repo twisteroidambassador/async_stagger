@@ -10,7 +10,23 @@ from .typing import AddrInfoType, HostType, PortType
 from .constants import (
     CONNECT_DELAY, FIRST_ADDRESS_FAMILY_COUNT, RESOLUTION_DELAY)
 
-__all__ = ['create_connected_sock', 'create_connection', 'open_connection']
+__all__ = [
+    'create_connected_sock',
+    'create_connection',
+    'open_connection',
+    'HappyEyeballsConnectError',
+]
+
+
+class HappyEyeballsConnectError(Exception):
+    """Encapsulate all exceptions encountered during connection.
+
+    This exception is raised when :func:`~async_stagger.create_connected_sock`
+    fails with the *detailed_exceptions* argument set. The *args* of this
+    exception consists of a list of *(remote_addr, local_addr, exc)* tuples,
+    where each tuple represents the result of one connection attempt.
+    """
+    pass
 
 
 async def _connect_sock(
@@ -54,6 +70,7 @@ async def create_connected_sock(
         interleave: int = FIRST_ADDRESS_FAMILY_COUNT,
         async_dns: bool = False,
         resolution_delay: float = RESOLUTION_DELAY,
+        detailed_exceptions: bool = False,
         loop: asyncio.AbstractEventLoop = None,
 ) -> socket.socket:
     """Connect to *(host, port)* and return a connected socket.
@@ -133,6 +150,17 @@ async def create_connected_sock(
             if IPv4 addresses are resolved first. This is the "Resolution
             Delay" as defined in :rfc:`8305`.
 
+        detailed_exceptions: Determines what exception to raise when all
+            connection attempts fail. If set to True, an instance of
+            :class:`~async_stagger.HappyEyeballsConnectError` is raised, which
+            contains the individual exceptions raised by each connection
+            attempt.
+            When set to false (default), an exception is raised the same
+            way as :func:`asyncio.create_connection`: if all the connection
+            attempt exceptions have the same ``str``, one of them is raised,
+            otherwise an instance of *OSError* is raised whose message contains
+            ``str`` representations of all connection attempt exceptions.
+
         loop: Event loop to use.
 
     Returns:
@@ -170,34 +198,44 @@ async def create_connected_sock(
     else:
         local_addrinfo_aiter = aitertools.aiter_from_iter((None,))
 
-    # Yay for async comprehensions!
-    connect_tasks = (
-        partial(_connect_sock, ai, lai, loop=loop)
+    connections = []
+
+    async def connect_tasks():
         async for ai, lai in aitertools.product(
             remote_addrinfo_aiter, local_addrinfo_aiter
-        )
-    )
+        ):
+            connections.append((ai, lai))
+            yield partial(_connect_sock, ai, lai, loop=loop)
 
     # Use a separate task for each (remote_addr, local_addr) pair. When
     # multiple local addresses are specified, this depends on the OS quickly
     # failing address combinations that don't work (e.g. an IPv6 remote
-    # address with an IPv4 local address). If your OS can't figure that out,
+    # address with an IPv4 local address). Come to think of it, since the
+    # family of the socket is determined by the remote address, if the remote
+    # and local addresses have different family, binding local address should
+    # raise an exception. If your OS can't figure that out,
     # it's probably time to get a better OS.
     winner_socket, _, exceptions = await staggered_race(
-        connect_tasks, delay, loop=loop)
+        connect_tasks(), delay, loop=loop)
+    assert len(connections) == len(exceptions)
+
     if winner_socket:
         return winner_socket
-    if len(exceptions) == 1:
-        raise exceptions[0]
-    else:
-        # If they all have the same str(), raise one.
-        model = str(exceptions[0])
-        if all(str(exc) == model for exc in exceptions):
+    if not detailed_exceptions:
+        # Raise one exception like loop.create_connection
+        if len(exceptions) == 1:
             raise exceptions[0]
-        # Raise a combined exception so the user can see all
-        # the various error messages.
-        raise OSError('Multiple exceptions: {}'.format(
-            ', '.join(str(exc) for exc in exceptions)))
+        else:
+            # If they all have the same str(), raise one.
+            model = str(exceptions[0])
+            if all(str(exc) == model for exc in exceptions):
+                raise exceptions[0]
+            # Raise a combined exception so the user can see all
+            # the various error messages.
+            raise OSError('Multiple exceptions: {}'.format(
+                ', '.join(str(exc) for exc in exceptions)))
+    else:
+        raise HappyEyeballsConnectError(list(zip(connections, exceptions)))
 
 
 create_connected_sock_kwds = tuple(
