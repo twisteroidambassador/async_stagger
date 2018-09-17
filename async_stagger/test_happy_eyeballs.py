@@ -58,9 +58,9 @@ class MockSocket:
             fileno=None
     ):
         if fileno is not None:
-            raise OSError('fileno not supported')
+            raise OSError(0, 'fileno not supported')
         if family not in {socket.AF_INET, socket.AF_INET6}:
-            raise OSError('family not supported')
+            raise OSError(0, 'family not supported')
         self._family = family
         self._type = type
         self._proto = proto
@@ -72,18 +72,18 @@ class MockSocket:
 
     def setblocking(self, blocking):
         if self.closed:
-            raise OSError('socket closed')
+            raise OSError(0, 'socket closed')
         self.blocking = blocking
 
     def bind(self, address):
         if self.closed:
-            raise OSError('socket closed')
+            raise OSError(0, 'socket closed')
         if self.sockname is not None:
-            raise OSError('socket already bound')
+            raise OSError(0, 'socket already bound')
         try:
             socket.inet_pton(self._family, address[0])
         except OSError as e:
-            raise OSError('invalid bind address family') from e
+            raise OSError(0, 'invalid bind address family') from e
         self._bind_response(address)
         self.sockname = address
 
@@ -92,13 +92,13 @@ class MockSocket:
 
     async def async_connect(self, address):
         if self.closed:
-            raise OSError('socket closed')
+            raise OSError(0, 'socket closed')
         if self.peername is not None:
-            raise OSError('socket already connected')
+            raise OSError(0, 'socket already connected')
         try:
             socket.inet_pton(self._family, address[0])
         except OSError as e:
-            raise OSError('invalid connect address family') from e
+            raise OSError(0, 'invalid connect address family') from e
         await self._connect_response(address)
         self.peername = address
 
@@ -306,10 +306,10 @@ async def test_create_connected_sock_connect_fail_detailed_exception(
     class MockSocketConnectFail(MockSocket):
         def _bind_response(self, address):
             if address[0] == '::1':
-                raise OSError('bind failed')
+                raise OSError(0, 'bind failed')
 
         async def _connect_response(self, address):
-            raise OSError('connect call failed')
+            raise OSError(0, 'connect call failed')
 
     mocker.patch('socket.socket', wraps=MockSocketConnectFail)
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
@@ -321,4 +321,9 @@ async def test_create_connected_sock_connect_fail_detailed_exception(
             'magic-host', 80, local_addr=('localhost', 0),
             detailed_exceptions=True)
 
-    assert len(exc_info.value.args[0]) == 16
+    exc = exc_info.value
+    assert len(exc.args[0]) == 16
+    for t in exc.args[0]:
+        assert t[0] in IPV6_ADDRINFOS + IPV4_ADDRINFOS
+        assert t[1] in LOCALHOST_ADDRINFOS
+        assert isinstance(t[2], OSError)

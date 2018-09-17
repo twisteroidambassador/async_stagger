@@ -235,7 +235,8 @@ async def create_connected_sock(
             raise OSError('Multiple exceptions: {}'.format(
                 ', '.join(str(exc) for exc in exceptions)))
     else:
-        raise HappyEyeballsConnectError(list(zip(connections, exceptions)))
+        raise HappyEyeballsConnectError(
+            list((*c, e) for c, e in zip(connections, exceptions)))
 
 
 create_connected_sock_kwds = tuple(
