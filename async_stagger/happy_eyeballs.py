@@ -23,8 +23,9 @@ class HappyEyeballsConnectError(Exception):
 
     This exception is raised when :func:`~async_stagger.create_connected_sock`
     fails with the *detailed_exceptions* argument set. The *args* of this
-    exception consists of a list of *(remote_addr, local_addr, exc)* tuples,
-    where each tuple represents the result of one connection attempt.
+    exception consists of a list of
+    *(remote_addrinfo, local_addrinfo, exception)* tuples, where each tuple
+    represents the result of one connection attempt.
     """
     pass
 
