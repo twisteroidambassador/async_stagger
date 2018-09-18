@@ -50,7 +50,8 @@ async def _connect_sock(
                 raise OSError(
                     e.errno,
                     f'error while attempting to bind on address {laddr!r}: '
-                    f'{e.strerror.lower()}')
+                    f'{e.strerror.lower()}',
+                    *e.args[2:])
         await loop.sock_connect(sock, address)
         return sock
     except:
