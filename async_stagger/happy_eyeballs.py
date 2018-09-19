@@ -240,13 +240,13 @@ async def create_connected_sock(
     assert len(connections) == len(exceptions)
 
     if winner_socket:
-        debug_log('Starting Happy Eyeballs connection to (%r, %r) '
+        debug_log('Happy Eyeballs connection to (%r, %r) '
                   'from %r succeeded, connected socket %r',
                   host, port, local_addrs, winner_socket)
         return winner_socket
 
     debug_log('Happy eyeballs connection to (%r, %r) from %r failed',
-              host, port)
+              host, port, local_addrs)
     if not detailed_exceptions:
         # Raise one exception like loop.create_connection
         if len(exceptions) == 1:
