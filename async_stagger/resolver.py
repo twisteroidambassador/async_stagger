@@ -277,10 +277,9 @@ async def _async_builtin_resolver(
               host, port, type_, proto, flags)
 
     # Determine whether host is an IP address literal
-    addrinfos = _ipaddr_info(host, port, socket.AF_UNSPEC, type_, proto)
-    if addrinfos is not None:
-        for addrinfo in addrinfos:
-            yield addrinfo
+    addrinfo = _ipaddr_info(host, port, socket.AF_UNSPEC, type_, proto)
+    if addrinfo is not None:
+        yield addrinfo
         return
 
     # These two deques will be changed by the resolve tasks, assume they will

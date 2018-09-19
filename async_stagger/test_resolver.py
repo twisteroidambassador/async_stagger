@@ -102,6 +102,39 @@ async def test_builtin_resolver_family_af_inet6(
 
 
 @pytest.mark.asyncio
+async def test_builtin_resolver_ipv4_literal(
+        event_loop: asyncio.AbstractEventLoop, mocker):
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+
+    infos = await list_from_aiter(
+        resolver.builtin_resolver('127.0.0.1', 80, type_=socket.SOCK_STREAM))
+    assert infos == [(
+        socket.AF_INET,
+        socket.SOCK_STREAM,
+        socket.IPPROTO_TCP,
+        '',
+        ('127.0.0.1', 80)
+    )]
+    event_loop.getaddrinfo.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_builtin_resolver_ipv6_literal(
+        event_loop: asyncio.AbstractEventLoop, mocker):
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+
+    infos = await list_from_aiter(
+        resolver.builtin_resolver('::1', 80, type_=socket.SOCK_STREAM))
+    assert infos == [(
+        socket.AF_INET6,
+        socket.SOCK_STREAM,
+        socket.IPPROTO_TCP,
+        '',
+        ('::1', 80, 0, 0))]
+    event_loop.getaddrinfo.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_async_resolver_gai_empty(
         event_loop: asyncio.AbstractEventLoop, mocker):
 
@@ -284,3 +317,38 @@ async def test_async_resolver_family_af_inet6(
         0.25,
     )
     assert infos == IPV6_ADDRINFOS
+
+
+@pytest.mark.asyncio
+async def test_async_resolver_ipv4_literal(
+        event_loop: asyncio.AbstractEventLoop, mocker):
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+
+    infos = await list_from_aiter(
+        resolver.async_builtin_resolver(
+            '127.0.0.1', 80, type_=socket.SOCK_STREAM))
+    assert infos == [(
+        socket.AF_INET,
+        socket.SOCK_STREAM,
+        socket.IPPROTO_TCP,
+        '',
+        ('127.0.0.1', 80)
+    )]
+    event_loop.getaddrinfo.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_builtin_resolver_ipv6_literal(
+        event_loop: asyncio.AbstractEventLoop, mocker):
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+
+    infos = await list_from_aiter(
+        resolver.async_builtin_resolver(
+            '::1', 80, type_=socket.SOCK_STREAM))
+    assert infos == [(
+        socket.AF_INET6,
+        socket.SOCK_STREAM,
+        socket.IPPROTO_TCP,
+        '',
+        ('::1', 80, 0, 0))]
+    event_loop.getaddrinfo.assert_not_called()
