@@ -10,6 +10,7 @@ from typing import (
 )
 
 from . import aitertools
+from .debug import AS_DEBUG, logger
 
 __all__ = ['staggered_race']
 
@@ -113,12 +114,22 @@ async def staggered_race(
         exceptions.append(None)
         assert len(exceptions) == this_index + 1
 
+        coro = coro_fn()
         try:
-            result = await coro_fn()
+            if AS_DEBUG:
+                logger.debug(
+                    'Running coroutine %r, created from %r', coro, coro_fn)
+            result = await coro
         except Exception as e:
+            if AS_DEBUG:
+                logger.debug('Coroutine %r failed with %r', coro, e)
             exceptions[this_index] = e
             this_failed.set()  # Kickstart the next coroutine
         else:
+            if AS_DEBUG:
+                logger.debug(
+                    'Coroutine %r completed successfully, result: %r',
+                    coro, result)
             # Store winner's results
             nonlocal winner_index, winner_result
             assert winner_index is None
@@ -155,3 +166,4 @@ async def staggered_race(
         # Make sure no tasks are left running if we leave this function
         for t in tasks:
             t.cancel()
+        await asyncio.wait(tasks)
