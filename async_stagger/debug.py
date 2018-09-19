@@ -12,3 +12,8 @@ def get_debug():
 def set_debug(enabled):
     global AS_DEBUG
     AS_DEBUG = enabled
+
+
+def debug_log(*args, **kwargs):
+    if AS_DEBUG:
+        logger.debug(*args, **kwargs)

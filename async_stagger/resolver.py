@@ -16,7 +16,7 @@ import socket
 from typing import AsyncIterator, Tuple, Iterable, List, Optional, Iterator
 
 from .typing import AddrInfoType, HostType, PortType
-from .debug import AS_DEBUG, logger
+from .debug import debug_log
 from .constants import RESOLUTION_DELAY, FIRST_ADDRESS_FAMILY_COUNT
 
 
@@ -35,10 +35,9 @@ async def _getaddrinfo_raise_on_empty(
 ) -> List[AddrInfoType]:
     # DRY at work.
     loop = loop or asyncio.get_event_loop()
-    if AS_DEBUG:
-        logger.debug(
-            'Resolving (%r, %r), family=%r, type=%r, proto=%r, flags=%r',
-            host, port, family, type_, proto, flags)
+    debug_log(
+        'Resolving (%r, %r), family=%r, type=%r, proto=%r, flags=%r',
+        host, port, family, type_, proto, flags)
     addrinfos = await loop.getaddrinfo(
         host, port, family=family, type=type_, proto=proto, flags=flags)
     if not addrinfos:
@@ -46,10 +45,9 @@ async def _getaddrinfo_raise_on_empty(
             f'getaddrinfo({host!r}, {port!r}, family={family!r}, '
             f'type={type_!r}, proto={proto!r}, flags={flags!r}) '
             f'returned empty list')
-    if AS_DEBUG:
-        logger.debug(
-            'Resolved (%r, %r), family=%r, type=%r, proto=%r, flags=%r: %r',
-            host, port, family, type_, proto, flags, addrinfos)
+    debug_log(
+        'Resolved (%r, %r), family=%r, type=%r, proto=%r, flags=%r: %r',
+        host, port, family, type_, proto, flags, addrinfos)
     return addrinfos
 
 
@@ -275,10 +273,8 @@ async def _async_builtin_resolver(
     finished resolving. The behavior is detailed in :rfc:`8305#section-3`.
     """
     loop = loop or asyncio.get_event_loop()
-    if AS_DEBUG:
-        logger.debug(
-            'Async resolving (%r, %r), type=%r, proto=%r, flags=%r',
-            host, port, type_, proto, flags)
+    debug_log('Async resolving (%r, %r), type=%r, proto=%r, flags=%r',
+              host, port, type_, proto, flags)
 
     # Determine whether host is an IP address literal
     addrinfos = _ipaddr_info(host, port, socket.AF_UNSPEC, type_, proto)
@@ -366,7 +362,5 @@ async def _async_builtin_resolver(
                 t.exception()
             except asyncio.CancelledError:
                 pass
-        if AS_DEBUG:
-            logger.debug(
-                'Async resolution (%r, %r), type=%r, proto=%r, flags=%r '
-                'finalized', host, port, type_, proto, flags)
+        debug_log('Async resolution (%r, %r), type=%r, proto=%r, flags=%r '
+                  'finalized', host, port, type_, proto, flags)

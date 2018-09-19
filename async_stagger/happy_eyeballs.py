@@ -6,7 +6,7 @@ from typing import Callable, Tuple, Optional, Iterable
 from . import aitertools
 from . import resolver
 from .stagger import staggered_race
-from .debug import AS_DEBUG, logger
+from .debug import debug_log
 from .typing import AddrInfoType, HostType, PortType
 from .constants import (
     CONNECT_DELAY, FIRST_ADDRESS_FAMILY_COUNT, RESOLUTION_DELAY)
@@ -38,10 +38,8 @@ async def _connect_sock(
         loop: asyncio.AbstractEventLoop = None
 ) -> socket.socket:
     """Create, bind and connect one socket."""
-    if AS_DEBUG:
-        logger.debug(
-            'Creating socket with remote addrinfo %r, local addrinfo %r',
-            addr_info, local_addr_info)
+    debug_log('Creating socket with remote addrinfo %r, local addrinfo %r',
+              addr_info, local_addr_info)
     loop = loop or asyncio.get_event_loop()
     family, type_, proto, _, address = addr_info
     try:
@@ -59,21 +57,19 @@ async def _connect_sock(
                         f'{e.strerror.lower()}',
                         *e.args[2:])
             await loop.sock_connect(sock, address)
-            if AS_DEBUG:
-                logger.debug(
-                    'Socket %r successfully connected for remote addrinfo %r, '
-                    'local addrinfo %r',
-                    sock, addr_info, local_addr_info)
+            debug_log(
+                'Socket %r successfully connected for remote addrinfo %r, '
+                'local addrinfo %r',
+                sock, addr_info, local_addr_info)
             return sock
         except:
             sock.close()
             raise
     except Exception as e:
-        if AS_DEBUG:
-            logger.debug(
-                'Creating socket with remote addrinfo %r, local addrinfo %r '
-                'failed with exception %r',
-                addr_info, local_addr_info, e)
+        debug_log(
+            'Creating socket with remote addrinfo %r, local addrinfo %r '
+            'failed with exception %r',
+            addr_info, local_addr_info, e)
         raise
 
 
@@ -201,10 +197,9 @@ async def create_connected_sock(
                              'at the same time')
         local_addrs = [local_addr]
 
-    if AS_DEBUG:
-        logger.debug('Starting Happy Eyeballs connection to (%r, %r), '
-                     'local addresses %r',
-                     host, port, local_addrs)
+    debug_log('Starting Happy Eyeballs connection to (%r, %r), '
+              'local addresses %r',
+              host, port, local_addrs)
 
     if not async_dns:
         remote_addrinfo_aiter = resolver.builtin_resolver(
@@ -245,19 +240,13 @@ async def create_connected_sock(
     assert len(connections) == len(exceptions)
 
     if winner_socket:
-        if AS_DEBUG:
-            logger.debug('Starting Happy Eyeballs connection to (%r, %r) '
-                         'from %r succeeded, connected socket %r',
-                         host, port, local_addrs, winner_socket)
+        debug_log('Starting Happy Eyeballs connection to (%r, %r) '
+                  'from %r succeeded, connected socket %r',
+                  host, port, local_addrs, winner_socket)
         return winner_socket
 
-    if AS_DEBUG:
-        logger.debug('Happy eyeballs connection to (%r, %r) from %r failed, '
-                     'exceptions:',
-                     host, port, local_addrs)
-        for (rai, lai), exc in zip(connections, exceptions):
-            logger.debug('Remote addrinfo: %r, local addrinfo: %r, '
-                         'exception: %r', rai, lai, exc)
+    debug_log('Happy eyeballs connection to (%r, %r) from %r failed',
+              host, port)
     if not detailed_exceptions:
         # Raise one exception like loop.create_connection
         if len(exceptions) == 1:
