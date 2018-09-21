@@ -320,7 +320,10 @@ async def _async_builtin_resolver(
                     pending, return_when=asyncio.FIRST_COMPLETED)
                 # "Consume" any exception
                 for d in done:
-                    d.exception()
+                    exc = d.exception()
+                    if exc:
+                        debug_log('Resolution task %r raised exception: %r',
+                                  d, exc)
                 continue
             # There's something to yield
             if extra_v6_addrs_to_yield > 0:
@@ -352,14 +355,15 @@ async def _async_builtin_resolver(
             f'IPv6: <{v6_resolve_task.exception()!r}>, '
             f'IPv4: <{v4_resolve_task.exception()!r}>')
     finally:
-        v6_resolve_task.cancel()
-        v4_resolve_task.cancel()
         # Clean up any remaining tasks and consume their exceptions
-        await asyncio.wait((v6_resolve_task, v4_resolve_task))
-        for t in (v6_resolve_task, v4_resolve_task):
-            try:
-                t.exception()
-            except asyncio.CancelledError:
-                pass
+        for p in pending:
+            p.cancel()
+        done, pending = await asyncio.wait(pending)
+        assert not pending
+        for d in done:
+            exc = d.exception()
+            if exc:
+                debug_log('Resolution task %r raised exception: %r',
+                          d, exc)
         debug_log('Async resolution (%r, %r), type=%r, proto=%r, flags=%r '
                   'finalized', host, port, type_, proto, flags)
