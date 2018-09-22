@@ -356,14 +356,15 @@ async def _async_builtin_resolver(
             f'IPv4: <{v4_resolve_task.exception()!r}>')
     finally:
         # Clean up any remaining tasks and consume their exceptions
-        for p in pending:
-            p.cancel()
-        done, pending = await asyncio.wait(pending)
-        assert not pending
-        for d in done:
-            exc = d.exception()
-            if exc:
-                debug_log('Resolution task %r raised exception: %r',
-                          d, exc)
+        if pending:
+            for p in pending:
+                p.cancel()
+            done, pending = await asyncio.wait(pending)
+            assert not pending
+            for d in done:
+                exc = d.exception()
+                if exc:
+                    debug_log('Resolution task %r raised exception: %r',
+                              d, exc)
         debug_log('Async resolution (%r, %r), type=%r, proto=%r, flags=%r '
                   'finalized', host, port, type_, proto, flags)
