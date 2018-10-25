@@ -23,7 +23,8 @@ async def staggered_race(
 ) -> Tuple[
     Any,
     Optional[int],
-    List[Optional[Exception]]
+    List[Optional[Exception]],
+    Optional[Exception],
 ]:
     """Run coroutines with staggered start times and take the first to finish.
 
@@ -61,7 +62,7 @@ async def staggered_race(
         loop: the event loop to use.
 
     Returns:
-        tuple *(winner_result, winner_index, exceptions)* where
+        tuple *(winner_result, winner_index, coro_exc, aiter_exc)* where
 
         - *winner_result*: the result of the winning coroutine, or ``None``
           if no coroutines won.
@@ -71,14 +72,21 @@ async def staggered_race(
           coroutine may return None on success, *winner_index* can be used
           to definitively determine whether any coroutine won.
 
-        - *exceptions*: list of exceptions returned by the coroutines.
+        - *coro_exc*: list of exceptions raised by the coroutines.
           ``len(exceptions)`` is equal to the number of coroutines actually
           started, and the order is the same as in ``coro_fns``. The winning
           coroutine's entry is ``None``.
 
+        - *aiter_exc*: exception raised by the *coro_fns* async iterable,
+          or ``None`` if *coro_fns* was iterated to completion without raising
+          any exception.
+
     .. versionchanged:: v0.2.0
        *coro_fns* argument now takes an async iterable instead of a regular
        iterable.
+
+    .. versionchanged:: v0.3.0
+       The return value is now a 4-tuple. *aiter_exc* is added.
 
     """
     loop = loop or asyncio.get_event_loop()
@@ -87,6 +95,7 @@ async def staggered_race(
     winner_index = None
     exceptions = []
     tasks = []
+    aiter_exc = None
 
     async def run_one_coro(
             previous_failed: Optional[asyncio.Event],
@@ -104,6 +113,13 @@ async def staggered_race(
         try:
             coro_fn = await aitertools.anext(aiter_coro_fns)
         except StopAsyncIteration:
+            debug_log('Async iterator exhausted on iteration %d', this_index)
+            return
+        except Exception as e:
+            nonlocal aiter_exc
+            aiter_exc = e
+            debug_log('Async iterator raised exception on iteration %d',
+                      this_index, exc_info=True)
             return
         # Start task that will run the next coroutine
         this_failed = asyncio.Event()
@@ -115,11 +131,13 @@ async def staggered_race(
         assert len(exceptions) == this_index + 1
 
         coro = coro_fn()
+        debug_log('Got coroutine function %r, will run coroutine %r',
+                  coro_fn, coro)
         try:
-            debug_log('Running coroutine %r, created from %r', coro, coro_fn)
             result = await coro
         except Exception as e:
-            debug_log('Coroutine %r failed with %r', coro, e)
+            debug_log('Coroutine %r failed with exception',
+                      coro, exc_info=True)
             exceptions[this_index] = e
             this_failed.set()  # Kickstart the next coroutine
         else:
@@ -156,8 +174,11 @@ async def staggered_race(
             if __debug__:
                 for d in done:
                     if d.done() and not d.cancelled() and d.exception():
-                        raise d.exception()
-        return winner_result, winner_index, exceptions
+                        raise RuntimeError(
+                            'Logic bug in staggeed_race() or '
+                            'catastrophic failure in asyncio'
+                        ) from d.exception()
+        return winner_result, winner_index, exceptions, aiter_exc
     finally:
         # Make sure no tasks are left running if we leave this function
         for t in tasks:
