@@ -6,6 +6,7 @@ from typing import AsyncIterable, List, Iterable, Iterator
 import pytest
 
 from . import resolver
+from . import exceptions
 
 
 pytestmark = pytest.mark.skipif(
@@ -143,8 +144,12 @@ async def test_async_resolver_gai_empty(
 
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
 
-    with pytest.raises(OSError):
+    with pytest.raises(exceptions.HappyEyeballsConnectError) as exc_info:
         await list_from_aiter(resolver.async_builtin_resolver('localhost', 80))
+
+    assert len(exc_info.value.args[0]) == 2
+    assert all(isinstance(e, OSError) for e in exc_info.value.args[0])
+    assert all('returned empty list' in str(e) for e in exc_info.value.args[0])
 
 
 @pytest.mark.asyncio
@@ -156,8 +161,11 @@ async def test_async_resolver_gai_exc(
 
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
 
-    with pytest.raises(OSError):
+    with pytest.raises(exceptions.HappyEyeballsConnectError) as exc_info:
         await list_from_aiter(resolver.async_builtin_resolver('localhost', 80))
+
+    assert len(exc_info.value.args[0]) == 2
+    assert all(isinstance(e, socket.gaierror) for e in exc_info.value.args[0])
 
 
 @pytest.mark.asyncio

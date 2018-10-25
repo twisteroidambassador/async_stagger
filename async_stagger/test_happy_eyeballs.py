@@ -4,6 +4,7 @@ import socket
 
 import pytest
 
+import async_stagger.exceptions
 from . import happy_eyeballs
 
 
@@ -316,14 +317,11 @@ async def test_create_connected_sock_connect_fail_detailed_exception(
     mocker.patch.object(
         event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
 
-    with pytest.raises(happy_eyeballs.HappyEyeballsConnectError) as exc_info:
+    with pytest.raises(async_stagger.exceptions.HappyEyeballsConnectError) as exc_info:
         s = await happy_eyeballs.create_connected_sock(
             'magic-host', 80, local_addr=('localhost', 0),
             detailed_exceptions=True)
 
     exc = exc_info.value
     assert len(exc.args[0]) == 16
-    for t in exc.args[0]:
-        assert t[0] in IPV6_ADDRINFOS + IPV4_ADDRINFOS
-        assert t[1] in LOCALHOST_ADDRINFOS
-        assert isinstance(t[2], OSError)
+    assert all(isinstance(e, OSError) for e in exc.args[0])

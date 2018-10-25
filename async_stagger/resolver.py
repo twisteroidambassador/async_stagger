@@ -15,6 +15,7 @@ import itertools
 import socket
 from typing import AsyncIterator, Tuple, Iterable, List, Optional, Iterator
 
+from . import exceptions
 from .typing import AddrInfoType, HostType, PortType
 from .debug import debug_log
 from .constants import RESOLUTION_DELAY, FIRST_ADDRESS_FAMILY_COUNT
@@ -350,10 +351,8 @@ async def _async_builtin_resolver(
         if has_yielded:
             return
 
-        raise OSError(
-            f'Address resolution failed, '
-            f'IPv6: <{v6_resolve_task.exception()!r}>, '
-            f'IPv4: <{v4_resolve_task.exception()!r}>')
+        raise exceptions.HappyEyeballsConnectError(
+            [v4_resolve_task.exception(), v6_resolve_task.exception()])
     finally:
         # Clean up any remaining tasks and consume their exceptions
         if pending:
