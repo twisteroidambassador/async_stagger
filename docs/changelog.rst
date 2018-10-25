@@ -2,6 +2,22 @@ Changelog
 #########
 
 
+v0.3.0
+======
+
+Backwards incompatible change:
+Added new return value *aiter_exc* to :func:`~async_stagger.staggered_race`.
+It contains the exception raised by the async iterator, if any.
+
+Added new argument *detailed_exceptions* to
+:func:`~async_stagger.create_connected_sock`.
+When set to True, when the connection fails, a
+:class:`~async_stagger.exceptions.HappyEyeballsConnectError` is raised,
+containing all the exceptions raised by the connect / resolution tasks.
+
+Added debug logging features.
+
+
 v0.2.1
 ======
 
