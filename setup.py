@@ -27,6 +27,7 @@ setup(
         'Documentation': 'http://async_stagger.readthedocs.io',
     },
     packages=find_packages(),
+    package_data={'async_stagger', ['py.typed']},
     python_requires='>=3.6',
     extras_require={
         'test': ['pytest', 'pytest-asyncio', 'pytest-mock'],
