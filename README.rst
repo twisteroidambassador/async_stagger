@@ -32,7 +32,8 @@ Python's standard library provides several high-level methods of establishing
 TCP connections towards a host name: The **socket** module has
 ``socket.create_connection``,
 and **asyncio** has ``loop.create_connection`` and ``asyncio.open_connection``.
-These methods have the same behavior when a host name resolves to several IP
+By default,
+these methods have the same behavior when a host name resolves to several IP
 addresses: they try to connect to the first address in the list,
 and only after the attempt fails (which may take tens of seconds) will
 the second one be tried, and so on. In contrast, the Happy Eyeballs algorithm
@@ -46,6 +47,9 @@ successfully.
 
 Happy Eyeballs is particularly important for dual-stack clients, when some hosts
 may have resolvable IPv6 addresses that are somehow unreachable.
+
+Starting from Python 3.8, stock **asyncio** also supports Happy Eyeballs.
+See below for a comparison.
 
 
 What does ``async_stagger`` has to offer?
@@ -106,6 +110,24 @@ This project is under active development, and APIs may change in the future.
 Check out the Changelog in the documentation.
 
 This project is licensed under the MIT license.
+
+
+Python 3.8 Has Native Happy Eyeballs Now
+========================================
+
+I contributed an implementation of Happy Eyeballs to upstream **asyncio**,
+and it landed in Python 3.8: see `the docs`__ for details.
+
+__ https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.create_connection
+
+That implementation is essentially an early version of this package,
+so it lacks these features:
+
+* Async address resolution
+* Detailed exception report
+* The `local_addrs` argument (as opposed to `local_addr`)
+
+Still, it should be sufficient for most scenarios, and it's right there in the standard library.
 
 
 Miscellaneous Remarks
