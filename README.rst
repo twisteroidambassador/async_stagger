@@ -125,7 +125,7 @@ so it lacks these features:
 
 * Async address resolution
 * Detailed exception report
-* The `local_addrs` argument (as opposed to `local_addr`)
+* The ``local_addrs`` argument (as opposed to ``local_addr``)
 
 Still, it should be sufficient for most scenarios, and it's right there in the standard library.
 
