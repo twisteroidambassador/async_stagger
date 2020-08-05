@@ -85,6 +85,34 @@ except ImportError:
             return aiterator.__anext__()
 
 
+async def aiterclose(aiterator: AsyncIterator):
+    """Close the async iterator if possible.
+
+    Async generators have an aclose() method that closes the generator and
+    cleans up associated resources. Plain async iterators do ont have anything
+    similar, but PEP 533 suggests adding an __aiterclose__() method, and having
+    it called automatically when exiting from an *async with* loop.
+
+    This function tries to close the async iterator using either method, and
+    if neither is available, does nothing.
+
+    Args:
+        aiterator: the async iterator to close.
+
+    Returns:
+        An awaitable that will close the async iterator.
+    """
+    if not isinstance(aiterator, collections.abc.AsyncIterator):
+        raise TypeError(f'{type(aiterator).__name__!r} object '
+                        f'is not an asynchronous iterator')
+    if hasattr(aiterator, "__aiterclose__"):
+        # PEP 533 recommends that "__aiterclose__ calls self.aclose()",
+        # so we assume it does, and do not call aclose() ourselves
+        return await aiterator.__aiterclose__()
+    if hasattr(aiterator, "aclose"):
+        return await aiterator.aclose()
+
+
 async def aiter_from_iter(
         iterable: Iterable[T],
 ) -> AsyncIterator[T]:

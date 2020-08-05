@@ -184,3 +184,4 @@ async def staggered_race(
         for t in tasks:
             t.cancel()
         await asyncio.wait(tasks)
+        await aitertools.aiterclose(aiter_coro_fns)
