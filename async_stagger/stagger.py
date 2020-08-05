@@ -135,11 +135,13 @@ async def staggered_race(
                   coro_fn, coro)
         try:
             result = await coro
+        except asyncio.CancelledError as e:
+            debug_log('Coroutine %r cancelled', coro)
+            exceptions[this_index] = e
         except Exception as e:
             debug_log('Coroutine %r failed with exception',
                       coro, exc_info=True)
             exceptions[this_index] = e
-            this_failed.set()  # Kickstart the next coroutine
         else:
             debug_log(
                 'Coroutine %r completed successfully, result: %r',
@@ -159,6 +161,8 @@ async def staggered_race(
             for i, t in enumerate(tasks):
                 if i != this_index:
                     t.cancel()
+        finally:
+            this_failed.set()  # Kickstart the next coroutine
 
     first_task = loop.create_task(run_one_coro(None))
     tasks.append(first_task)
