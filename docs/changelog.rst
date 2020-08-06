@@ -2,6 +2,15 @@ Changelog
 #########
 
 
+Master
+======
+
+Added support for Python 3.8.
+
+Added :func:`~async_stagger.aitertools.aiterclose` that tries to close an
+async iterator.
+
+
 v0.3.0
 ======
 
