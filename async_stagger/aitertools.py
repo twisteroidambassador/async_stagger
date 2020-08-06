@@ -5,7 +5,7 @@ import itertools
 from typing import (
     AsyncIterable, AsyncIterator, Awaitable, Iterable, TypeVar)
 
-__all__ = ['aiter', 'anext', 'aiter_from_iter', 'product']
+__all__ = ['aiter', 'anext', 'aiterclose', 'aiter_from_iter', 'product']
 
 
 T = TypeVar('T')
