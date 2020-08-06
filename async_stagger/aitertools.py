@@ -98,9 +98,6 @@ async def aiterclose(aiterator: AsyncIterator):
 
     Args:
         aiterator: the async iterator to close.
-
-    Returns:
-        An awaitable that will close the async iterator.
     """
     if not isinstance(aiterator, collections.abc.AsyncIterator):
         raise TypeError(f'{type(aiterator).__name__!r} object '
