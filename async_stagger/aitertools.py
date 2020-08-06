@@ -162,33 +162,34 @@ async def product(
         return
     aiterators = [aiter(a) for a in aiterables]
     try:
-        initial_values = await asyncio.gather(*(anext(a) for a in aiterators))
-    except StopAsyncIteration:
-        # some of the aiterators are empty:
-        # yield nothing to match itertools.product
-        return
-    initial_prefix = initial_values * (repeat - 1)
-    yield tuple(itertools.chain(initial_prefix, initial_values))
-    rev_values = list([v] for v in reversed(initial_values))
+        try:
+            initial_values = await asyncio.gather(*(anext(a) for a in aiterators))
+        except StopAsyncIteration:
+            # some of the aiterators are empty:
+            # yield nothing to match itertools.product
+            return
+        initial_prefix = initial_values * (repeat - 1)
+        yield tuple(itertools.chain(initial_prefix, initial_values))
+        rev_values = list([v] for v in reversed(initial_values))
 
-    for rev_idx, aiter_to_exhaust in enumerate(reversed(aiterators)):
-        async for item in aiter_to_exhaust:
-            rev_values[rev_idx].append(item)
-            for exhausted_product in itertools.product(
-                    *reversed(rev_values[:rev_idx])):
-                yield tuple(itertools.chain(
-                    initial_prefix,
-                    initial_values[:-1-rev_idx],
-                    (item,),
-                    exhausted_product,
-                ))
+        for rev_idx, aiter_to_exhaust in enumerate(reversed(aiterators)):
+            async for item in aiter_to_exhaust:
+                rev_values[rev_idx].append(item)
+                for exhausted_product in itertools.product(
+                        *reversed(rev_values[:rev_idx])):
+                    yield tuple(itertools.chain(
+                        initial_prefix,
+                        initial_values[:-1-rev_idx],
+                        (item,),
+                        exhausted_product,
+                    ))
 
-    values = list(reversed(rev_values))
-    prefix_product = itertools.product(*values, repeat=repeat-1)
-    next(prefix_product)
-    for prefix in prefix_product:
-        for p in itertools.product(*values):
-            yield tuple(itertools.chain(prefix, p))
-
-
-
+        values = list(reversed(rev_values))
+        prefix_product = itertools.product(*values, repeat=repeat-1)
+        next(prefix_product)
+        for prefix in prefix_product:
+            for p in itertools.product(*values):
+                yield tuple(itertools.chain(prefix, p))
+    finally:
+        for it in aiterators:
+            await aiterclose(it)
