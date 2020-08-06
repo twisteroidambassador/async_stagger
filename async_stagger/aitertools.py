@@ -88,10 +88,10 @@ except ImportError:
 async def aiterclose(aiterator: AsyncIterator):
     """Close the async iterator if possible.
 
-    Async generators have an `aclose()` method that closes the generator and
+    Async generators have an ``aclose()`` method that closes the generator and
     cleans up associated resources. Plain async iterators do not have anything
-    similar, but :pep:`533` suggests adding an `__aiterclose__()` method, and having
-    it called automatically when exiting from an `async with` loop.
+    similar, but :pep:`533` suggests adding an ``__aiterclose__()`` method, and having
+    it called automatically when exiting from an ``async with`` loop.
 
     This function tries to close the async iterator using either method, and
     if neither is available, does nothing.
