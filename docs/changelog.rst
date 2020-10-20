@@ -2,7 +2,7 @@ Changelog
 #########
 
 
-Master
+v0.3.1
 ======
 
 Added support for Python 3.8.

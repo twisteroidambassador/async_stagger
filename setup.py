@@ -5,7 +5,7 @@ with open('README.rst', 'rt') as readme_file:
 
 setup(
     name='async_stagger',
-    version='0.3.0',
+    version='0.3.1',
     description='Happy eyeballs and underlying scheduling algorithm in asyncio',
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -21,6 +21,8 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
     keywords='happy-eyeballs dual-stack tcp',
     project_urls={
