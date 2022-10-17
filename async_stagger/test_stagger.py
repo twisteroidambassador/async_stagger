@@ -15,6 +15,30 @@ from .aitertools import aiter_from_iter
 
 
 @pytest.mark.asyncio
+async def test_simultaneous_done_fail():
+    for _ in range(50):
+        await simultaneous_done_fail()
+
+
+async def simultaneous_done_fail():
+    async def first():
+        await asyncio.sleep(0.3)
+        return 1
+
+    async def second():
+        await asyncio.sleep(0.1)
+        raise RuntimeError('2')
+
+    async def third():
+        await asyncio.sleep(0.05)
+        return 3
+
+    coro_fns = aiter_from_iter((first, second, third))
+
+    winner_result, winner_idx, exc, aiter_exc = await staggered_race(coro_fns, 0.2)
+
+
+@pytest.mark.asyncio
 async def test_stagger_random_tasks():
     for _ in range(10):
         await random_tasks()
