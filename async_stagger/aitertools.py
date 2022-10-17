@@ -5,84 +5,10 @@ import itertools
 from typing import (
     AsyncIterable, AsyncIterator, Awaitable, Iterable, TypeVar)
 
-__all__ = ['aiter', 'anext', 'aiterclose', 'aiter_from_iter', 'product']
+__all__ = ['aiterclose', 'aiter_from_iter', 'product']
 
 
 T = TypeVar('T')
-
-
-# Get aiter() and anext() somewhere
-try:
-    from builtins import aiter
-except ImportError:
-    # https://bugs.python.org/issue31861 talks about potentially putting
-    # aiter() and anext() in the operator module
-    try:
-        from operator import aiter
-    except ImportError:
-        def aiter(aiterable: AsyncIterable[T]) -> AsyncIterator[T]:
-            """Return an async iterator from an async iterable.
-
-            If an ``aiter`` function is available as a builtin or in the
-            :mod:`operator` module, it is imported into
-            :mod:`async_stagger.aitertools`, and this function will not be
-            defined.
-            Only when a stock ``aiter`` is not available will this
-            function be defined.
-
-            Unlike the built-in :func:`iter()`, this only support one argument,
-            and does not support the two-argument (callable, sentinel) usage.
-
-            Adapted from implementation attached to
-            https://bugs.python.org/issue31861 by Davide Rizzo.
-
-            Args:
-                aiterable: The async iterable.
-
-            Returns:
-                The async iterator produced from the given async iterable.
-            """
-            if not isinstance(aiterable, collections.abc.AsyncIterable):
-                raise TypeError(
-                    f'{type(aiterable).__name__!r} object '
-                    f'is not asynchronously iterable')
-            return aiterable.__aiter__()
-
-try:
-    from builtins import anext
-except ImportError:
-    try:
-        from operator import anext
-    except ImportError:
-        def anext(aiterator: AsyncIterator[T]) -> Awaitable[T]:
-            """Return the next item from an async iterator.
-
-            If an ``anext`` function is available as a builtin or in the
-            :mod:`operator` module, it is imported into
-            :mod:`async_stagger.aitertools`, and this function will not be
-            defined.
-            Only when a stock ``anext`` is not available will this
-            function be defined.
-
-            Unlike the built-in :func:`next`, this does not support providing a
-            default value.
-
-            This is a regular function that returns an awaitable, so usually
-            you should await its result: ``await anext(it)``
-
-            Adapted from implementation attached to
-            https://bugs.python.org/issue31861 by Davide Rizzo.
-
-            Args:
-                aiterator: the async iterator.
-
-            Returns:
-                An awaitable that will return the next item in the iterator.
-            """
-            if not isinstance(aiterator, collections.abc.AsyncIterator):
-                raise TypeError(f'{type(aiterator).__name__!r} object '
-                                f'is not an asynchronous iterator')
-            return aiterator.__anext__()
 
 
 async def aiterclose(aiterator: AsyncIterator):

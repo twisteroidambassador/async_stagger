@@ -90,7 +90,7 @@ async def staggered_race(
 
     """
     loop = loop or asyncio.get_event_loop()
-    aiter_coro_fns = aitertools.aiter(coro_fns)
+    aiter_coro_fns = aiter(coro_fns)
     winner_result = None
     winner_index = None
     exceptions = []
@@ -111,7 +111,7 @@ async def staggered_race(
                 await asyncio.wait_for(previous_failed.wait(), delay)
         # Get the next coroutine to run
         try:
-            coro_fn = await aitertools.anext(aiter_coro_fns)
+            coro_fn = await anext(aiter_coro_fns)
         except StopAsyncIteration:
             debug_log('Async iterator exhausted on iteration %d', this_index)
             return
