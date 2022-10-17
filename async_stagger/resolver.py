@@ -32,10 +32,9 @@ async def _getaddrinfo_raise_on_empty(
         type_: int = 0,
         proto: int = 0,
         flags: int = 0,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> List[AddrInfoType]:
     # DRY at work.
-    loop = loop or asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     debug_log(
         'Resolving (%r, %r), family=%r, type=%r, proto=%r, flags=%r',
         host, port, family, type_, proto, flags)
@@ -132,10 +131,8 @@ async def _ensure_resolved(
         type_: int = 0,
         proto: int = 0,
         flags: int = 0,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> List[AddrInfoType]:
     # This function is adapted from asyncio/base_events.py.
-    loop = loop or asyncio.get_event_loop()
     host, port = address[:2]
     info = _ipaddr_info(host, port, family, type_, proto)
     if info is not None:
@@ -144,7 +141,7 @@ async def _ensure_resolved(
     else:
         return await _getaddrinfo_raise_on_empty(
             host, port, family=family, type_=type_,
-            proto=proto, flags=flags, loop=loop)
+            proto=proto, flags=flags)
 
 
 def _roundrobin(*iters: Iterable) -> Iterator:
@@ -185,17 +182,15 @@ async def builtin_resolver(
         proto: int = 0,
         flags: int = 0,
         first_addr_family_count: int = FIRST_ADDRESS_FAMILY_COUNT,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> AsyncIterator[AddrInfoType]:
     """Resolver using built-in getaddrinfo().
 
     Interleaves addresses by family if required, and yield results as an
     async iterable. Nothing spectacular.
     """
-    loop = loop or asyncio.get_event_loop()
     addrinfos = await _ensure_resolved(
         (host, port), family=family, type_=type_,
-        proto=proto, flags=flags, loop=loop)
+        proto=proto, flags=flags)
     addrinfos = _interleave_addrinfos(addrinfos, first_addr_family_count)
     # it would be nice if "yield from addrinfos" worked, but alas,
     # https://www.python.org/dev/peps/pep-0525/#asynchronous-yield-from
@@ -209,7 +204,6 @@ async def ensure_multiple_addrs_resolved(
         type_: int = 0,
         proto: int = 0,
         flags: int = 0,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> AsyncIterator[AddrInfoType]:
     """Ensure all addresses in *addresses* are resolved.
 
@@ -217,11 +211,10 @@ async def ensure_multiple_addrs_resolved(
     resolved before yielding any of them, in case some of them raise
     exceptions when resolving.
     """
-    loop = loop or asyncio.get_event_loop()
     results = await asyncio.gather(*(
         _ensure_resolved(
             addr, family=family, type_=type_, proto=proto,
-            flags=flags, loop=loop
+            flags=flags,
         )
         for addr in addresses
     ))
@@ -239,7 +232,6 @@ def async_builtin_resolver(
         flags: int = 0,
         resolution_delay: float = RESOLUTION_DELAY,
         first_addr_family_count: int = FIRST_ADDRESS_FAMILY_COUNT,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> AsyncIterator[AddrInfoType]:
     """Dispatcher function for async resolver.
 
@@ -249,11 +241,11 @@ def async_builtin_resolver(
         return _async_builtin_resolver(
             host, port, type_=type_, proto=proto, flags=flags,
             resolution_delay=resolution_delay,
-            first_addr_family_count=first_addr_family_count, loop=loop)
+            first_addr_family_count=first_addr_family_count)
     else:
         return builtin_resolver(
             host, port, family=family, type_=type_, proto=proto, flags=flags,
-            first_addr_family_count=first_addr_family_count, loop=loop)
+            first_addr_family_count=first_addr_family_count)
 
 
 async def _async_builtin_resolver(
@@ -265,7 +257,6 @@ async def _async_builtin_resolver(
         flags: int = 0,
         resolution_delay: float = RESOLUTION_DELAY,
         first_addr_family_count: int = FIRST_ADDRESS_FAMILY_COUNT,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> AsyncIterator[AddrInfoType]:
     """Asynchronous resolver using built-in getaddrinfo().
 
@@ -273,7 +264,6 @@ async def _async_builtin_resolver(
     in parallel, and addresses can be yielded as soon as either address family
     finished resolving. The behavior is detailed in :rfc:`8305#section-3`.
     """
-    loop = loop or asyncio.get_event_loop()
     debug_log('Async resolving (%r, %r), type=%r, proto=%r, flags=%r',
               host, port, type_, proto, flags)
 
@@ -291,19 +281,19 @@ async def _async_builtin_resolver(
     async def resolve_ipv6():
         v6_infos.extend(await _getaddrinfo_raise_on_empty(
             host, port, family=socket.AF_INET6,
-            type_=type_, proto=proto, flags=flags, loop=loop))
+            type_=type_, proto=proto, flags=flags))
 
-    v6_resolve_task = loop.create_task(resolve_ipv6())
+    v6_resolve_task = asyncio.create_task(resolve_ipv6())
 
     async def resolve_ipv4():
         infos = await _getaddrinfo_raise_on_empty(
             host, port, family=socket.AF_INET,
-            type_=type_, proto=proto, flags=flags, loop=loop)
+            type_=type_, proto=proto, flags=flags)
         if not v6_resolve_task.done():
             await asyncio.wait((v6_resolve_task,), timeout=resolution_delay)
         v4_infos.extend(infos)
 
-    v4_resolve_task = loop.create_task(resolve_ipv4())
+    v4_resolve_task = asyncio.create_task(resolve_ipv4())
     pending = {v6_resolve_task, v4_resolve_task}
 
     extra_v6_addrs_to_yield = first_addr_family_count - 1

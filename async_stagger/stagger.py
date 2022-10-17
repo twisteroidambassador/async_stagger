@@ -18,8 +18,6 @@ __all__ = ['staggered_race']
 async def staggered_race(
         coro_fns: AsyncIterable[Callable[[], Awaitable]],
         delay: Optional[float],
-        *,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> Tuple[
     Any,
     Optional[int],
@@ -59,8 +57,6 @@ async def staggered_race(
         delay: amount of time, in seconds, between starting coroutines. If
             ``None``, the coroutines will run sequentially.
 
-        loop: the event loop to use.
-
     Returns:
         tuple *(winner_result, winner_index, coro_exc, aiter_exc)* where
 
@@ -88,8 +84,10 @@ async def staggered_race(
     .. versionchanged:: v0.3.0
        The return value is now a 4-tuple. *aiter_exc* is added.
 
+    .. versionchanged:: v0.4.0
+       Removed *loop* parameter.
+
     """
-    loop = loop or asyncio.get_event_loop()
     aiter_coro_fns = aiter(coro_fns)
     winner_result = None
     winner_index = None
@@ -123,7 +121,7 @@ async def staggered_race(
             return
         # Start task that will run the next coroutine
         this_failed = asyncio.Event()
-        next_task = loop.create_task(run_one_coro(this_failed, this_index+1))
+        next_task = asyncio.create_task(run_one_coro(this_failed, this_index+1))
         tasks.append(next_task)
         assert len(tasks) == this_index + 2
         # Prepare place to put this coroutine's exceptions if not won
@@ -164,7 +162,7 @@ async def staggered_race(
         finally:
             this_failed.set()  # Kickstart the next coroutine
 
-    first_task = loop.create_task(run_one_coro(None))
+    first_task = asyncio.create_task(run_one_coro(None))
     tasks.append(first_task)
     try:
         # Wait for a growing list of tasks to all finish: poor man's version of
