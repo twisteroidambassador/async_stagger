@@ -93,6 +93,7 @@ async def staggered_race(
     winner_index = None
     exceptions = []
     tasks = []
+    taskgroup = asyncio.TaskGroup()
     aiter_exc = None
 
     async def run_one_coro(
@@ -102,11 +103,8 @@ async def staggered_race(
         # Wait for the previous task to finish, or for delay seconds
         if previous_failed is not None:
             with suppress(asyncio.TimeoutError):
-                # Use asyncio.wait_for() instead of asyncio.wait() here, so
-                # that if we get cancelled at this point, Event.wait() is also
-                # cancelled, otherwise there will be a "Task destroyed but it is
-                # pending" later.
-                await asyncio.wait_for(previous_failed.wait(), delay)
+                async with asyncio.timeout(delay):
+                    await previous_failed.wait()
         # Get the next coroutine to run
         try:
             coro_fn = await anext(aiter_coro_fns)
@@ -121,7 +119,7 @@ async def staggered_race(
             return
         # Start task that will run the next coroutine
         this_failed = asyncio.Event()
-        next_task = asyncio.create_task(run_one_coro(this_failed, this_index+1))
+        next_task = taskgroup.create_task(run_one_coro(this_failed, this_index+1))
         tasks.append(next_task)
         assert len(tasks) == this_index + 2
         # Prepare place to put this coroutine's exceptions if not won
@@ -162,28 +160,13 @@ async def staggered_race(
         finally:
             this_failed.set()  # Kickstart the next coroutine
 
-    first_task = asyncio.create_task(run_one_coro(None))
-    tasks.append(first_task)
     try:
-        # Wait for a growing list of tasks to all finish: poor man's version of
-        # curio's TaskGroup or trio's nursery
-        done_count = 0
-        while done_count != len(tasks):
-            done, _ = await asyncio.wait(tasks)
-            done_count = len(done)
-            # If run_one_coro raises an unhandled exception, it's probably a
-            # programming error, and I want to see it.
-            if __debug__:
-                for d in done:
-                    if d.done() and not d.cancelled() and d.exception():
-                        raise RuntimeError(
-                            'Logic bug in staggeed_race() or '
-                            'catastrophic failure in asyncio'
-                        ) from d.exception()
+        async with taskgroup:
+            first_task = taskgroup.create_task(run_one_coro(None))
+            tasks.append(first_task)
+            # exiting *async with* waits for all tasks in taskgroup
+            # If any task in taskgroup raises an unhandled exception,
+            # a BaseExceptionGroup will be raised here
         return winner_result, winner_index, exceptions, aiter_exc
     finally:
-        # Make sure no tasks are left running if we leave this function
-        for t in tasks:
-            t.cancel()
-        await asyncio.wait(tasks)
         await aitertools.aiterclose(aiter_coro_fns)
