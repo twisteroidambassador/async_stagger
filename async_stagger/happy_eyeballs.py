@@ -245,7 +245,7 @@ async def create_connected_sock(
         else:
             # If they all have the same str(), raise one.
             model = str(exc[0])
-            if all(str(exc) == model for exc in exc):
+            if all(str(e) == model for e in exc):
                 raise exc[0]
             # Raise a combined exception so the user can see all
             # the various error messages.
