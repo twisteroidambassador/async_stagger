@@ -103,12 +103,13 @@ async def staggered_race(
     ) -> None:
         # Wait for the previous task to finish, or for delay seconds
         if previous_failed is not None:
-            with suppress(asyncio.TimeoutError):
-                # Use asyncio.wait_for() instead of asyncio.wait() here, so
-                # that if we get cancelled at this point, Event.wait() is also
-                # cancelled, otherwise there will be a "Task destroyed but it is
-                # pending" later.
-                await asyncio.wait_for(previous_failed.wait(), delay)
+            # asyncio.wait_for() is potentially affected by
+            # https://github.com/python/cpython/issues/86296
+            wait_task = asyncio.create_task(previous_failed.wait())
+            try:
+                await asyncio.wait((wait_task,), timeout=delay)
+            finally:
+                wait_task.cancel()
         # Get the next coroutine to run
         try:
             coro_fn = await aitertools.anext(aiter_coro_fns)
