@@ -76,7 +76,6 @@ async def create_connected_sock(
         async_dns: bool = False,
         resolution_delay: float = RESOLUTION_DELAY,
         detailed_exceptions: bool = False,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> socket.socket:
     """Connect to *(host, port)* and return a connected socket.
 
@@ -167,8 +166,6 @@ async def create_connected_sock(
             otherwise an instance of *OSError* is raised whose message contains
             ``str`` representations of all connection attempt exceptions.
 
-        loop: Event loop to use.
-
     Returns:
         The connected :class:`socket.socket` object.
 
@@ -178,8 +175,11 @@ async def create_connected_sock(
 
     .. versionadded:: v0.2.1
        the *async_dns* and *resolution_delay* parameters.
+
+    .. versionchanged:: v0.4.0
+       Removed *loop* parameter.
     """
-    loop = loop or asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     if local_addr is not None:
         if local_addrs is not None:
@@ -194,17 +194,17 @@ async def create_connected_sock(
     if not async_dns:
         remote_addrinfo_aiter = resolver.builtin_resolver(
             host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
-            flags=flags, first_addr_family_count=interleave, loop=loop)
+            flags=flags, first_addr_family_count=interleave)
     else:
         remote_addrinfo_aiter = resolver.async_builtin_resolver(
             host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
             flags=flags, resolution_delay=resolution_delay,
-            first_addr_family_count=interleave, loop=loop)
+            first_addr_family_count=interleave)
 
     if local_addrs is not None:
         local_addrinfo_aiter = resolver.ensure_multiple_addrs_resolved(
             local_addrs, family=family, type_=socket.SOCK_STREAM,
-            proto=proto, flags=flags, loop=loop)
+            proto=proto, flags=flags)
     else:
         local_addrinfo_aiter = aitertools.aiter_from_iter((None,))
 
@@ -223,7 +223,7 @@ async def create_connected_sock(
     # raise an exception. If your OS can't figure that out,
     # it's probably time to get a better OS.
     winner_socket, _, exc, aiter_exc = await staggered_race(
-        connect_tasks(), delay, loop=loop)
+        connect_tasks(), delay)
 
     if winner_socket:
         debug_log('Happy Eyeballs connection to (%r, %r) '
@@ -245,7 +245,7 @@ async def create_connected_sock(
         else:
             # If they all have the same str(), raise one.
             model = str(exc[0])
-            if all(str(exc) == model for exc in exc):
+            if all(str(e) == model for e in exc):
                 raise exc[0]
             # Raise a combined exception so the user can see all
             # the various error messages.
@@ -263,8 +263,6 @@ async def create_connection(
         protocol_factory: Callable[[], asyncio.Protocol],
         host: HostType,
         port: PortType,
-        *,
-        loop: asyncio.AbstractEventLoop = None,
         **kwargs,
 ) -> Tuple[asyncio.Transport, asyncio.Protocol]:
     """Connect to *(host, port)* and return *(transport, protocol)*.
@@ -281,7 +279,7 @@ async def create_connection(
         *(transport, protocol)*, the same as
         :meth:`asyncio.AbstractEventLoop.create_connection`.
     """
-    loop = loop or asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     # To avoid the trouble of synchronizing this function's argument list
     # to create_connected_sock, the keyword arguments meant for
     # create_connected_sock are extracted dynamically.
@@ -297,7 +295,7 @@ async def create_connection(
     # loop.create_connection will fail.
 
     sock = await create_connected_sock(
-        host, port, loop=loop, **create_connected_sock_kwargs)
+        host, port, **create_connected_sock_kwargs)
 
     try:
         # Defer to the event loop to create transport and protocol
@@ -311,8 +309,6 @@ async def create_connection(
 async def open_connection(
         host: HostType,
         port: PortType,
-        *,
-        loop: asyncio.AbstractEventLoop = None,
         **kwargs,
 ) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
     """Connect to (host, port) and return (reader, writer).
@@ -326,16 +322,16 @@ async def open_connection(
     Returns:
         *(reader, writer)*, the same as :func:`asyncio.open_connection`.
     """
-    loop = loop or asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     # Some gymnastics so I do not have to maintain a copy of the default value
     # for the keyword argument 'limit' for asyncio.open_connection and
     # asyncio.StreamReader
-    stream_reader_kwargs = {'loop': loop}
+    stream_reader_kwargs = {}
     if 'limit' in kwargs:
         stream_reader_kwargs['limit'] = kwargs.pop('limit')
     reader = asyncio.StreamReader(**stream_reader_kwargs)
-    protocol = asyncio.StreamReaderProtocol(reader, loop=loop)
+    protocol = asyncio.StreamReaderProtocol(reader)
     transport, _ = await create_connection(
-        lambda: protocol, host, port, loop=loop, **kwargs)
+        lambda: protocol, host, port, **kwargs)
     writer = asyncio.StreamWriter(transport, protocol, reader, loop)
     return reader, writer

@@ -15,18 +15,6 @@ async def arange(x, *, delay=0):
 
 
 @pytest.mark.asyncio
-async def test_aiter_anext():
-    aiterable = arange(10)
-    aiterator = aitertools.aiter(aiterable)
-    for i in range(10):
-        try:
-            new_i = await aitertools.anext(aiterator)
-            assert i == new_i
-        except StopAsyncIteration:
-            break
-
-
-@pytest.mark.asyncio
 async def test_aiter_from_iter():
     lst = list(range(10))
     new_lst = []

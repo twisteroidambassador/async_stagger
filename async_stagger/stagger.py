@@ -18,8 +18,6 @@ __all__ = ['staggered_race']
 async def staggered_race(
         coro_fns: AsyncIterable[Callable[[], Awaitable]],
         delay: Optional[float],
-        *,
-        loop: asyncio.AbstractEventLoop = None,
 ) -> Tuple[
     Any,
     Optional[int],
@@ -59,8 +57,6 @@ async def staggered_race(
         delay: amount of time, in seconds, between starting coroutines. If
             ``None``, the coroutines will run sequentially.
 
-        loop: the event loop to use.
-
     Returns:
         tuple *(winner_result, winner_index, coro_exc, aiter_exc)* where
 
@@ -88,13 +84,16 @@ async def staggered_race(
     .. versionchanged:: v0.3.0
        The return value is now a 4-tuple. *aiter_exc* is added.
 
+    .. versionchanged:: v0.4.0
+       Removed *loop* parameter.
+
     """
-    loop = loop or asyncio.get_event_loop()
-    aiter_coro_fns = aitertools.aiter(coro_fns)
+    aiter_coro_fns = aiter(coro_fns)
     winner_result = None
     winner_index = None
     exceptions = []
     tasks = []
+    taskgroup = asyncio.TaskGroup()
     aiter_exc = None
 
     async def run_one_coro(
@@ -103,16 +102,12 @@ async def staggered_race(
     ) -> None:
         # Wait for the previous task to finish, or for delay seconds
         if previous_failed is not None:
-            # asyncio.wait_for() is potentially affected by
-            # https://github.com/python/cpython/issues/86296
-            wait_task = asyncio.create_task(previous_failed.wait())
-            try:
-                await asyncio.wait((wait_task,), timeout=delay)
-            finally:
-                wait_task.cancel()
+            with suppress(asyncio.TimeoutError):
+                async with asyncio.timeout(delay):
+                    await previous_failed.wait()
         # Get the next coroutine to run
         try:
-            coro_fn = await aitertools.anext(aiter_coro_fns)
+            coro_fn = await anext(aiter_coro_fns)
         except StopAsyncIteration:
             debug_log('Async iterator exhausted on iteration %d', this_index)
             return
@@ -124,7 +119,7 @@ async def staggered_race(
             return
         # Start task that will run the next coroutine
         this_failed = asyncio.Event()
-        next_task = loop.create_task(run_one_coro(this_failed, this_index+1))
+        next_task = taskgroup.create_task(run_one_coro(this_failed, this_index+1))
         tasks.append(next_task)
         assert len(tasks) == this_index + 2
         # Prepare place to put this coroutine's exceptions if not won
@@ -165,28 +160,13 @@ async def staggered_race(
         finally:
             this_failed.set()  # Kickstart the next coroutine
 
-    first_task = loop.create_task(run_one_coro(None))
-    tasks.append(first_task)
     try:
-        # Wait for a growing list of tasks to all finish: poor man's version of
-        # curio's TaskGroup or trio's nursery
-        done_count = 0
-        while done_count != len(tasks):
-            done, _ = await asyncio.wait(tasks)
-            done_count = len(done)
-            # If run_one_coro raises an unhandled exception, it's probably a
-            # programming error, and I want to see it.
-            if __debug__:
-                for d in done:
-                    if d.done() and not d.cancelled() and d.exception():
-                        raise RuntimeError(
-                            'Logic bug in staggeed_race() or '
-                            'catastrophic failure in asyncio'
-                        ) from d.exception()
+        async with taskgroup:
+            first_task = taskgroup.create_task(run_one_coro(None))
+            tasks.append(first_task)
+            # exiting *async with* waits for all tasks in taskgroup
+            # If any task in taskgroup raises an unhandled exception,
+            # a BaseExceptionGroup will be raised here
         return winner_result, winner_index, exceptions, aiter_exc
     finally:
-        # Make sure no tasks are left running if we leave this function
-        for t in tasks:
-            t.cancel()
-        await asyncio.wait(tasks)
         await aitertools.aiterclose(aiter_coro_fns)
