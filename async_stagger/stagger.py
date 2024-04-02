@@ -157,6 +157,13 @@ async def staggered_race(
             for i, t in enumerate(tasks):
                 if i != this_index:
                     t.cancel()
+            # Note: we could also have abused the cancellation handling of
+            # TaskGroups to cancel all other tasks, by raising an exception
+            # from this task. However, doing that means the other tasks are
+            # cancelled slower, probably after one or more iterations of the
+            # event loop. This gives those tasks some chance to run or even
+            # finish successfully, which breaks the assumption that only one
+            # task wins. So we do not do that.
         finally:
             this_failed.set()  # Kickstart the next coroutine
 
