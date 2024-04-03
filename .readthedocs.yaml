@@ -6,7 +6,7 @@ python:
 
 build:
   tools:
-    python: 3.11
+    python: "3.11"
   os: ubuntu-22.04
 
 sphinx:
