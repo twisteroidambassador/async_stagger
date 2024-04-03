@@ -1,0 +1,14 @@
+version: 2
+
+python:
+  install:
+    - requirements: docs/requirements.txt
+
+build:
+  tools:
+    python: 3.11
+  os: ubuntu-22.04
+
+sphinx:
+  builder: html
+  configuration: docs/conf.py
