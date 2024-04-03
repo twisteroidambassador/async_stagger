@@ -2,12 +2,14 @@ Changelog
 #########
 
 Unreleased
-======
+==========
 
 Started using features in Python 3.11.
 As a result, dropped support for Python 3.10 and lower.
 
-Removed `aiter()` and `anext()` from :module:`~async_stagger.aitertools`
+Removed :func:`~async_stagger.aitertools.aiter`
+and :func:`~async_stagger.aitertools.anext`
+from :mod:`~async_stagger.aitertools`
 because they are now built-in.
 
 v0.3.1
