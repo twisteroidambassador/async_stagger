@@ -6,7 +6,7 @@ staggered_race is also imported into the base package for convenience.
 import asyncio
 from contextlib import suppress
 from typing import (
-    Callable, Any, Tuple, List, Optional, AsyncIterable, Awaitable
+    Callable, Any, Optional, AsyncIterable, Awaitable
 )
 
 from . import aitertools
@@ -18,10 +18,10 @@ __all__ = ['staggered_race']
 async def staggered_race(
         coro_fns: AsyncIterable[Callable[[], Awaitable]],
         delay: Optional[float],
-) -> Tuple[
+) -> tuple[
     Any,
     Optional[int],
-    List[Optional[Exception]],
+    list[Optional[Exception]],
     Optional[Exception],
 ]:
     """Run coroutines with staggered start times and take the first to finish.

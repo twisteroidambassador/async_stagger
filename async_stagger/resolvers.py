@@ -25,7 +25,7 @@ import collections
 import contextlib
 import itertools
 import socket
-from typing import AsyncIterator, Tuple, Iterable, List, Optional, Iterator
+from typing import AsyncIterator, Iterable, Optional, Iterator
 
 from . import exceptions
 from .typing import AddrInfoType, HostType, PortType
@@ -137,13 +137,13 @@ def _ipaddr_info(
 
 
 async def _ensure_resolved(
-        address: Tuple,
+        address: tuple,
         *,
         family: int = socket.AF_UNSPEC,
         type_: int = 0,
         proto: int = 0,
         flags: int = 0,
-) -> List[AddrInfoType]:
+) -> list[AddrInfoType]:
     # This function is adapted from asyncio/base_events.py.
     # Note: this function does not support the 4-tuple IPv6 address type.
     # It will silently discard flowinfo and scopeid.
@@ -179,7 +179,7 @@ def _weave(
 def _interleave_addrinfos(
         addrinfos: Iterable[AddrInfoType],
         first_address_family_count: int,
-) -> List[AddrInfoType]:
+) -> list[AddrInfoType]:
     """Interleave list of addrinfo tuples by family."""
     # Group addresses by family
     addrinfos_by_family = collections.OrderedDict()
@@ -220,7 +220,7 @@ async def builtin_resolver(
 
 
 async def ensure_multiple_addrs_resolved(
-        addresses: List[Tuple],
+        addresses: list[tuple],
         family: int = socket.AF_UNSPEC,
         type_: int = 0,
         proto: int = 0,

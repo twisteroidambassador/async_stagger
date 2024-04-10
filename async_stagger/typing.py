@@ -1,14 +1,13 @@
 """Types used in type hints around the package."""
 
-from typing import Tuple, Union
 
-AddrInfoType = Tuple[
+AddrInfoType = tuple[
     int,  # family
     int,  # type
     int,  # proto
     str,  # canonname
-    Tuple,  # sockaddr
+    tuple,  # sockaddr
 ]
 
-HostType = Union[str, bytes, None]
-PortType = Union[str, bytes, int, None]
+HostType = str | bytes | None
+PortType = str | bytes | int | None

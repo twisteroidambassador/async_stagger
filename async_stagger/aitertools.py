@@ -3,7 +3,7 @@ import asyncio
 import collections.abc
 import itertools
 from typing import (
-    AsyncIterable, AsyncIterator, Awaitable, Iterable, TypeVar)
+    AsyncIterable, AsyncIterator, Iterable, TypeVar)
 
 __all__ = ['aiterclose', 'aiter_from_iter', 'product']
 

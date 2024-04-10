@@ -1,7 +1,7 @@
 import asyncio
 import socket
 from functools import partial
-from typing import Callable, Tuple, Optional, Iterable
+from typing import Callable, Optional, Iterable
 
 from . import exceptions
 from . import aitertools
@@ -69,8 +69,8 @@ async def create_connected_sock(
         family: int = socket.AF_UNSPEC,
         proto: int = 0,
         flags: int = 0,
-        local_addr: Tuple = None,
-        local_addrs: Iterable[Tuple] = None,
+        local_addr: tuple = None,
+        local_addrs: Iterable[tuple] = None,
         delay: Optional[float] = CONNECT_DELAY,
         interleave: int = FIRST_ADDRESS_FAMILY_COUNT,
         async_dns: bool = False,
@@ -264,7 +264,7 @@ async def create_connection(
         host: HostType,
         port: PortType,
         **kwargs,
-) -> Tuple[asyncio.Transport, asyncio.Protocol]:
+) -> tuple[asyncio.Transport, asyncio.Protocol]:
     """Connect to *(host, port)* and return *(transport, protocol)*.
 
     This function does the same thing as
@@ -310,7 +310,7 @@ async def open_connection(
         host: HostType,
         port: PortType,
         **kwargs,
-) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
     """Connect to (host, port) and return (reader, writer).
 
     This function does the same thing as :func:`asyncio.open_connection`, with
