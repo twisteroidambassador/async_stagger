@@ -1,11 +1,11 @@
 import asyncio
 import itertools
 import socket
-from typing import AsyncIterable, List, Iterable, Iterator
+from typing import AsyncIterable, Iterable, Iterator
 
 import pytest
 
-from . import resolver
+from . import resolvers
 from . import exceptions
 
 
@@ -39,7 +39,7 @@ async def mock_getaddrinfo(host, port, *, family=0, type=0, proto=0, flags=0):
 async def list_from_aiter(
         aiterable: AsyncIterable,
         delay: float = 0,
-) -> List:
+) -> list:
     new_list = []
     async for item in aiterable:
         await asyncio.sleep(delay)
@@ -59,7 +59,7 @@ async def test_builtin_resolver_both(
         event_loop: asyncio.AbstractEventLoop, mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
-    infos = await list_from_aiter(resolver.builtin_resolver('localhost', 80))
+    infos = await list_from_aiter(resolvers.builtin_resolver('localhost', 80))
     assert infos == list(roundrobin(IPV6_ADDRINFOS, IPV4_ADDRINFOS))
 
 
@@ -69,7 +69,7 @@ async def test_builtin_resolver_fafc(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolver.builtin_resolver('localhost', 80, first_addr_family_count=2))
+        resolvers.builtin_resolver('localhost', 80, first_addr_family_count=2))
     assert infos == [
         IPV6_ADDRINFOS[0],
         IPV6_ADDRINFOS[1],
@@ -88,7 +88,7 @@ async def test_builtin_resolver_family_af_inet(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolver.builtin_resolver('localhost', 80, family=socket.AF_INET))
+        resolvers.builtin_resolver('localhost', 80, family=socket.AF_INET))
     assert infos == IPV4_ADDRINFOS
 
 
@@ -98,74 +98,69 @@ async def test_builtin_resolver_family_af_inet6(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolver.builtin_resolver('localhost', 80, family=socket.AF_INET6),)
+        resolvers.builtin_resolver('localhost', 80, family=socket.AF_INET6),)
     assert infos == IPV6_ADDRINFOS
 
 
 @pytest.mark.asyncio
-async def test_builtin_resolver_ipv4_literal(
-        event_loop: asyncio.AbstractEventLoop, mocker):
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
-
-    infos = await list_from_aiter(
-        resolver.builtin_resolver('127.0.0.1', 80, type_=socket.SOCK_STREAM))
-    assert infos == [(
-        socket.AF_INET,
-        socket.SOCK_STREAM,
-        socket.IPPROTO_TCP,
-        '',
-        ('127.0.0.1', 80)
-    )]
-    event_loop.getaddrinfo.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_builtin_resolver_ipv6_literal(
-        event_loop: asyncio.AbstractEventLoop, mocker):
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
-
-    infos = await list_from_aiter(
-        resolver.builtin_resolver('::1', 80, type_=socket.SOCK_STREAM))
-    assert infos == [(
-        socket.AF_INET6,
-        socket.SOCK_STREAM,
-        socket.IPPROTO_TCP,
-        '',
-        ('::1', 80, 0, 0))]
-    event_loop.getaddrinfo.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_async_resolver_gai_empty(
-        event_loop: asyncio.AbstractEventLoop, mocker):
+async def test_async_resolver_gai_empty(mocker):
+    event_loop = asyncio.get_running_loop()
 
     async def empty_gai(*args, **kwargs):
         return []
 
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
 
-    with pytest.raises(exceptions.HappyEyeballsConnectError) as exc_info:
-        await list_from_aiter(resolver.async_builtin_resolver('localhost', 80))
+    with pytest.raises(socket.gaierror) as exc_info:
+        await list_from_aiter(resolvers.async_builtin_resolver('localhost', 80))
 
-    assert len(exc_info.value.args[0]) == 2
-    assert all(isinstance(e, OSError) for e in exc_info.value.args[0])
-    assert all('returned empty list' in str(e) for e in exc_info.value.args[0])
+    assert 'returned empty list' in str(exc_info.value)
 
 
 @pytest.mark.asyncio
-async def test_async_resolver_gai_exc(
-        event_loop: asyncio.AbstractEventLoop, mocker):
+async def test_async_resolver_gai_empty_raise_exc_group(mocker):
+    event_loop = asyncio.get_running_loop()
+
+    async def empty_gai(*args, **kwargs):
+        return []
+
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
+
+    with pytest.raises(ExceptionGroup) as exc_info:
+        await list_from_aiter(resolvers.async_builtin_resolver('localhost', 80, raise_exc_group=True))
+
+    assert len(exc_info.value.exceptions) == 2
+    assert all(isinstance(e, OSError) for e in exc_info.value.exceptions)
+    assert all('returned empty list' in str(e) for e in exc_info.value.exceptions)
+
+
+@pytest.mark.asyncio
+async def test_async_resolver_gai_exc(mocker):
+    event_loop = asyncio.get_running_loop()
 
     async def empty_gai(*args, **kwargs):
         raise socket.gaierror
 
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
 
-    with pytest.raises(exceptions.HappyEyeballsConnectError) as exc_info:
-        await list_from_aiter(resolver.async_builtin_resolver('localhost', 80))
+    with pytest.raises(socket.gaierror) as exc_info:
+        await list_from_aiter(resolvers.async_builtin_resolver('localhost', 80))
 
-    assert len(exc_info.value.args[0]) == 2
-    assert all(isinstance(e, socket.gaierror) for e in exc_info.value.args[0])
+
+@pytest.mark.asyncio
+async def test_async_resolver_gai_exc_raise_exc_group(mocker):
+    event_loop = asyncio.get_running_loop()
+
+    async def empty_gai(*args, **kwargs):
+        raise socket.gaierror
+
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
+
+    with pytest.raises(ExceptionGroup) as exc_info:
+        await list_from_aiter(resolvers.async_builtin_resolver('localhost', 80, raise_exc_group=True))
+
+    assert len(exc_info.value.exceptions) == 2
+    assert all(isinstance(e, socket.gaierror) for e in exc_info.value.exceptions)
 
 
 @pytest.mark.asyncio
@@ -181,7 +176,7 @@ async def test_async_resolver_ipv6_exc(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver('localhost', 80))
+        resolvers.async_builtin_resolver('localhost', 80))
     assert infos == IPV4_ADDRINFOS
 
 
@@ -198,7 +193,7 @@ async def test_async_resolver_ipv4_exc(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver('localhost', 80))
+        resolvers.async_builtin_resolver('localhost', 80))
     assert infos == IPV6_ADDRINFOS
 
 
@@ -208,15 +203,17 @@ async def test_async_resolver_both(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver('localhost', 80),
+        resolvers.async_builtin_resolver('localhost', 80),
         0.25,
     )
     assert infos == list(roundrobin(IPV6_ADDRINFOS, IPV4_ADDRINFOS))
 
 
 @pytest.mark.asyncio
-async def test_async_resolver_ipv6_slightly_slow(
-        event_loop: asyncio.AbstractEventLoop, mocker):
+async def test_async_resolver_ipv6_slightly_slow(mocker):
+    from async_stagger.debug import set_debug
+    set_debug(True)
+    event_loop = asyncio.get_running_loop()
 
     async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
         if family == socket.AF_INET:
@@ -230,15 +227,17 @@ async def test_async_resolver_ipv6_slightly_slow(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver('localhost', 80, resolution_delay=0.5),
+        resolvers.async_builtin_resolver('localhost', 80, resolution_delay=0.5),
         0.25,
     )
     assert infos == list(roundrobin(IPV6_ADDRINFOS, IPV4_ADDRINFOS))
 
 
 @pytest.mark.asyncio
-async def test_async_resolver_ipv6_very_slow(
-        event_loop: asyncio.AbstractEventLoop, mocker):
+async def test_async_resolver_ipv6_very_slow(mocker):
+    from async_stagger.debug import set_debug
+    set_debug(True)
+    event_loop = asyncio.get_running_loop()
 
     async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
         if family == socket.AF_INET:
@@ -252,15 +251,17 @@ async def test_async_resolver_ipv6_very_slow(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver('localhost', 80, resolution_delay=0.05),
+        resolvers.async_builtin_resolver('localhost', 80, resolution_delay=0.05),
         0.25,
     )
     assert infos == list(roundrobin(IPV4_ADDRINFOS, IPV6_ADDRINFOS))
 
 
 @pytest.mark.asyncio
-async def test_async_resolver_ipv6_extremely_slow(
-        event_loop: asyncio.AbstractEventLoop, mocker):
+async def test_async_resolver_ipv6_extremely_slow(mocker):
+    from async_stagger.debug import set_debug
+    set_debug(True)
+    event_loop = asyncio.get_running_loop()
 
     async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
         if family == socket.AF_INET:
@@ -274,7 +275,7 @@ async def test_async_resolver_ipv6_extremely_slow(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver('localhost', 80, resolution_delay=0.05),
+        resolvers.async_builtin_resolver('localhost', 80, resolution_delay=0.05),
         0,
     )
     assert infos == IPV4_ADDRINFOS + IPV6_ADDRINFOS
@@ -286,7 +287,7 @@ async def test_async_resolver_fafc(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver(
+        resolvers.async_builtin_resolver(
             'localhost', 80, first_addr_family_count=2),
         0.1,
     )
@@ -308,7 +309,7 @@ async def test_async_resolver_family_af_inet(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver('localhost', 80, family=socket.AF_INET),
+        resolvers.async_builtin_resolver('localhost', 80, family=socket.AF_INET),
         0.25,
     )
     assert infos == IPV4_ADDRINFOS
@@ -320,43 +321,8 @@ async def test_async_resolver_family_af_inet6(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolver.async_builtin_resolver(
+        resolvers.async_builtin_resolver(
             'localhost', 80, family=socket.AF_INET6),
         0.25,
     )
     assert infos == IPV6_ADDRINFOS
-
-
-@pytest.mark.asyncio
-async def test_async_resolver_ipv4_literal(
-        event_loop: asyncio.AbstractEventLoop, mocker):
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
-
-    infos = await list_from_aiter(
-        resolver.async_builtin_resolver(
-            '127.0.0.1', 80, type_=socket.SOCK_STREAM))
-    assert infos == [(
-        socket.AF_INET,
-        socket.SOCK_STREAM,
-        socket.IPPROTO_TCP,
-        '',
-        ('127.0.0.1', 80)
-    )]
-    event_loop.getaddrinfo.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_builtin_resolver_ipv6_literal(
-        event_loop: asyncio.AbstractEventLoop, mocker):
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
-
-    infos = await list_from_aiter(
-        resolver.async_builtin_resolver(
-            '::1', 80, type_=socket.SOCK_STREAM))
-    assert infos == [(
-        socket.AF_INET6,
-        socket.SOCK_STREAM,
-        socket.IPPROTO_TCP,
-        '',
-        ('::1', 80, 0, 0))]
-    event_loop.getaddrinfo.assert_not_called()

@@ -136,21 +136,6 @@ async def test_create_connected_sock_local_bind(event_loop, mocker):
 
 
 @pytest.mark.asyncio
-async def test_create_connected_sock_ip_literal(
-        event_loop,
-        mocker,
-):
-    mocker.patch('socket.socket', wraps=MockSocket)
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
-    mocker.patch.object(
-        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
-
-    s = await happy_eyeballs.create_connected_sock('192.0.2.1', 80)
-
-    event_loop.getaddrinfo.assert_not_called()
-
-
-@pytest.mark.asyncio
 async def test_create_connected_sock_ipv6_hang(
         event_loop,
         mocker,

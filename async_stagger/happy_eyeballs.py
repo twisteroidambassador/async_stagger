@@ -5,7 +5,7 @@ from typing import Callable, Tuple, Optional, Iterable
 
 from . import exceptions
 from . import aitertools
-from . import resolver
+from . import resolvers
 from .stagger import staggered_race
 from .debug import debug_log
 from .typing import AddrInfoType, HostType, PortType
@@ -192,17 +192,17 @@ async def create_connected_sock(
               host, port, local_addrs)
 
     if not async_dns:
-        remote_addrinfo_aiter = resolver.builtin_resolver(
+        remote_addrinfo_aiter = resolvers.builtin_resolver(
             host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
             flags=flags, first_addr_family_count=interleave)
     else:
-        remote_addrinfo_aiter = resolver.async_builtin_resolver(
+        remote_addrinfo_aiter = resolvers.async_builtin_resolver(
             host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
             flags=flags, resolution_delay=resolution_delay,
             first_addr_family_count=interleave)
 
     if local_addrs is not None:
-        local_addrinfo_aiter = resolver.ensure_multiple_addrs_resolved(
+        local_addrinfo_aiter = resolvers.ensure_multiple_addrs_resolved(
             local_addrs, family=family, type_=socket.SOCK_STREAM,
             proto=proto, flags=flags)
     else:
