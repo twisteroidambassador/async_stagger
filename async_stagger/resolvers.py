@@ -63,101 +63,6 @@ async def _getaddrinfo_raise_on_empty(
     return addrinfos
 
 
-def _ipaddr_info(
-        host: HostType,
-        port: PortType,
-        family: int,
-        type_: int,
-        proto: int,
-) -> Optional[AddrInfoType]:
-    # This function is copied from asyncio/base_events.py with minimal
-    # modifications.
-
-    # Try to skip getaddrinfo if "host" is already an IP. Users might have
-    # handled name resolution in their own code and pass in resolved IPs.
-    if not hasattr(socket, 'inet_pton'):
-        return
-
-    if proto not in {0, socket.IPPROTO_TCP, socket.IPPROTO_UDP} or \
-            host is None:
-        return None
-
-    if type_ == socket.SOCK_STREAM:
-        # Linux only:
-        #    getaddrinfo() can raise when socket.type is a bit mask.
-        #    So if socket.type is a bit mask of SOCK_STREAM, and say
-        #    SOCK_NONBLOCK, we simply return None, which will trigger
-        #    a call to getaddrinfo() letting it process this request.
-        proto = socket.IPPROTO_TCP
-    elif type_ == socket.SOCK_DGRAM:
-        proto = socket.IPPROTO_UDP
-    else:
-        return None
-
-    if port is None:
-        port = 0
-    elif isinstance(port, bytes) and port == b'':
-        port = 0
-    elif isinstance(port, str) and port == '':
-        port = 0
-    else:
-        # If port's a service name like "http", don't skip getaddrinfo.
-        try:
-            port = int(port)
-        except (TypeError, ValueError):
-            return None
-
-    if family == socket.AF_UNSPEC:
-        afs = [socket.AF_INET]
-        if _HAS_IPv6:
-            afs.append(socket.AF_INET6)
-    else:
-        afs = [family]
-
-    if isinstance(host, bytes):
-        host = host.decode('idna')
-    if '%' in host:
-        # Linux's inet_pton doesn't accept an IPv6 zone index after host,
-        # like '::1%lo0'.
-        return None
-
-    for af in afs:
-        try:
-            socket.inet_pton(af, host)
-            # The host has already been resolved.
-            if _HAS_IPv6 and af == socket.AF_INET6:
-                return af, type_, proto, '', (host, port, 0, 0)
-            else:
-                return af, type_, proto, '', (host, port)
-        except OSError:
-            pass
-
-    # "host" is not an IP address.
-    return None
-
-
-async def _ensure_resolved(
-        address: tuple,
-        *,
-        family: int = socket.AF_UNSPEC,
-        type_: int = 0,
-        proto: int = 0,
-        flags: int = 0,
-) -> list[AddrInfoType]:
-    # This function is adapted from asyncio/base_events.py.
-    # Note: this function does not support the 4-tuple IPv6 address type.
-    # It will silently discard flowinfo and scopeid.
-    host, port = address[:2]
-    info = _ipaddr_info(host, port, family, type_, proto)
-    if info is not None:
-        # "host" is already a resolved IP.
-        return [info]
-    else:
-        return await _getaddrinfo_raise_on_empty(
-            host, port, family=family, type_=type_,
-            proto=proto, flags=flags)
-
-
 def _weave(
         first_iter: Iterable,
         *iters: Iterable,
@@ -217,30 +122,6 @@ async def builtin_resolver(
     # https://www.python.org/dev/peps/pep-0525/#asynchronous-yield-from
     for ai in addrinfos:
         yield ai
-
-
-async def ensure_multiple_addrs_resolved(
-        addresses: list[tuple],
-        family: int = socket.AF_UNSPEC,
-        type_: int = 0,
-        proto: int = 0,
-        flags: int = 0,
-) -> AsyncIterator[AddrInfoType]:
-    """Ensure all addresses in *addresses* are resolved.
-
-    This is for resolving multiple local bind addresses. All addresses are
-    resolved before yielding any of them, in case some of them raise
-    exceptions when resolving.
-    """
-    results = await asyncio.gather(*(
-        _ensure_resolved(
-            addr, family=family, type_=type_, proto=proto,
-            flags=flags,
-        )
-        for addr in addresses
-    ))
-    for addrinfo in itertools.chain.from_iterable(results):
-        yield addrinfo
 
 
 def async_builtin_resolver(
