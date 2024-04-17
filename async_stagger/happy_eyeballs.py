@@ -1,7 +1,7 @@
 import asyncio
 import socket
 from functools import partial
-from typing import Callable, Optional, Iterable
+from typing import Callable, Optional, Iterable, AsyncIterable
 
 from . import exceptions
 from . import aitertools
@@ -21,44 +21,43 @@ __all__ = [
 
 async def _connect_sock(
         addr_info: AddrInfoType,
-        local_addr_info: AddrInfoType = None,
+        local_addr: tuple = None,
         *,
         loop: asyncio.AbstractEventLoop = None
 ) -> socket.socket:
     """Create, bind and connect one socket."""
-    debug_log('Creating socket with remote addrinfo %r, local addrinfo %r',
-              addr_info, local_addr_info)
+    debug_log('Creating socket with remote addrinfo %r, local addr %r',
+              addr_info, local_addr)
     loop = loop or asyncio.get_event_loop()
     family, type_, proto, _, address = addr_info
     try:
         sock = socket.socket(family=family, type=type_, proto=proto)
         try:
             sock.setblocking(False)
-            if local_addr_info is not None:
-                laddr = local_addr_info[4]
+            if local_addr is not None:
                 try:
-                    sock.bind(laddr)
+                    sock.bind(local_addr)
                 except OSError as e:
                     raise OSError(
                         e.errno,
-                        f'error while attempting to bind on address {laddr!r}: '
+                        f'error while attempting to bind on address {local_addr!r}: '
                         f'{e.strerror.lower()}',
                         *e.args[2:])
             await loop.sock_connect(sock, address)
             debug_log(
                 'Socket %r successfully connected for remote addrinfo %r, '
-                'local addrinfo %r',
-                sock, addr_info, local_addr_info)
+                'local addr %r',
+                sock, addr_info, local_addr)
             return sock
         except:
             sock.close()
             raise
     except Exception:
-        # This will also catch asyncio.CancelledError.
+        # This will NOT catch asyncio.CancelledError.
         debug_log(
-            'Creating socket with remote addrinfo %r, local addrinfo %r '
+            'Creating socket with remote addrinfo %r, local addr %r '
             'failed with exception',
-            addr_info, local_addr_info, exc_info=True)
+            addr_info, local_addr, exc_info=True)
         raise
 
 
@@ -69,8 +68,7 @@ async def create_connected_sock(
         family: int = socket.AF_UNSPEC,
         proto: int = 0,
         flags: int = 0,
-        local_addr: tuple = None,
-        local_addrs: Iterable[tuple] = None,
+        local_addrs: Iterable[tuple] | AsyncIterable[tuple] = None,
         delay: Optional[float] = CONNECT_DELAY,
         interleave: int = FIRST_ADDRESS_FAMILY_COUNT,
         async_dns: bool = False,
@@ -121,17 +119,15 @@ async def create_connected_sock(
 
         flags: Flags passed to :func:`~asyncio.AbstractEventLoop.getaddrinfo`.
             See documentation on :func:`socket.getaddrinfo` for details.
-
-        local_addr: *(local_host, local_port)* tuple used to bind the socket to
-            locally. The *local_host* and *local_port* are looked up using
-            :func:`~asyncio.AbstractEventLoop.getaddrinfo` if necessary,
             similar to *host* and *port*.
 
-        local_addrs: An iterable of (local_host, local_port) tuples, all of
+        local_addrs: A sync or async iterable of address tuples, all of
             which are candidates for locally binding the socket to. This allows
-            e.g. providing one IPv4 and one IPv6 address. Addresses are looked
-            up using :func:`~asyncio.AbstractEventLoop.getaddrinfo`
-            if necessary.
+            e.g. providing one IPv4 and one IPv6 address.
+            Addresses must be already resolved. In particular, IPv4 addresses
+            must be 2-tuples of ``(host, port)``, and IPv6 addresses
+            must be 4-tuples of ``(host, port, flowinfo, scope_id)``,
+            where ``host`` is the literal representation of the address.
 
         delay: Amount of time to wait before making connections to different
             addresses. This is the "Connect Attempt Delay" as defined in
@@ -177,15 +173,16 @@ async def create_connected_sock(
        the *async_dns* and *resolution_delay* parameters.
 
     .. versionchanged:: v0.4.0
-       Removed *loop* parameter.
+       *local_addrs* parameter now takes sync or async iterables of already-resolved
+       addresses. Support for host names is removed.
+
+    .. versionremoved:: v0.4.0
+       the *loop* parameter.
+
+    .. versionremoved:: v0.4.0
+       the *local_addr* parameter. Use *local_addrs* instead.
     """
     loop = asyncio.get_running_loop()
-
-    if local_addr is not None:
-        if local_addrs is not None:
-            raise ValueError('local_addr and local_addrs cannot be specified '
-                             'at the same time')
-        local_addrs = [local_addr]
 
     debug_log('Starting Happy Eyeballs connection to (%r, %r), '
               'local addresses %r',
@@ -202,17 +199,18 @@ async def create_connected_sock(
             first_addr_family_count=interleave)
 
     if local_addrs is not None:
-        local_addrinfo_aiter = resolvers.ensure_multiple_addrs_resolved(
-            local_addrs, family=family, type_=socket.SOCK_STREAM,
-            proto=proto, flags=flags)
+        try:
+            local_addrs_aiter = aiter(local_addrs)
+        except TypeError:
+            local_addrs_aiter = aitertools.aiter_from_iter(local_addrs)
     else:
-        local_addrinfo_aiter = aitertools.aiter_from_iter((None,))
+        local_addrs_aiter = aitertools.aiter_from_iter((None,))
 
     async def connect_tasks():
-        async for ai, lai in aitertools.product(
-            remote_addrinfo_aiter, local_addrinfo_aiter
+        async for ai, la in aitertools.product(
+            remote_addrinfo_aiter, local_addrs_aiter
         ):
-            yield partial(_connect_sock, ai, lai, loop=loop)
+            yield partial(_connect_sock, ai, la, loop=loop)
 
     # Use a separate task for each (remote_addr, local_addr) pair. When
     # multiple local addresses are specified, this depends on the OS quickly

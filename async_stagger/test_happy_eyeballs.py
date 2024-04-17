@@ -12,10 +12,10 @@ pytestmark = pytest.mark.skipif(
     not hasattr(socket, 'AF_INET6'), reason='Platform does not support IPv6')
 
 IPV6_ADDRINFOS = [
-    (socket.AF_INET6, 0, 0, '', ('2001:db8::1', 1)),
-    (socket.AF_INET6, 0, 0, '', ('2001:db8::2', 2)),
-    (socket.AF_INET6, 0, 0, '', ('2001:db8::3', 3)),
-    (socket.AF_INET6, 0, 0, '', ('2001:db8::4', 4)),
+    (socket.AF_INET6, 0, 0, '', ('2001:db8::1', 1, 0, 0)),
+    (socket.AF_INET6, 0, 0, '', ('2001:db8::2', 2, 0, 0)),
+    (socket.AF_INET6, 0, 0, '', ('2001:db8::3', 3, 0, 0)),
+    (socket.AF_INET6, 0, 0, '', ('2001:db8::4', 4, 0, 0)),
 ]
 
 IPV4_ADDRINFOS = [
@@ -25,9 +25,9 @@ IPV4_ADDRINFOS = [
     (socket.AF_INET, 0, 0, '', ('192.0.2.4', 8)),
 ]
 
-LOCALHOST_ADDRINFOS = [
-    (socket.AF_INET6, 0, 0, '', ('::1', 9)),
-    (socket.AF_INET, 0, 0, '', ('127.0.0.1', 10)),
+LOCALHOST_ADDRS = [
+    ('::1', 9, 0, 0),
+    ('127.0.0.1', 10),
 ]
 
 
@@ -39,13 +39,6 @@ async def mock_getaddrinfo(host, port, *, family=0, type=0, proto=0, flags=0):
             return IPV4_ADDRINFOS
         else:
             return IPV6_ADDRINFOS + IPV4_ADDRINFOS
-    elif host == 'localhost':
-        if family == socket.AF_INET6:
-            return LOCALHOST_ADDRINFOS[0:1]
-        elif family == socket.AF_INET:
-            return LOCALHOST_ADDRINFOS[1:2]
-        else:
-            return LOCALHOST_ADDRINFOS
     else:
         raise socket.gaierror('invalid host')
 
@@ -71,6 +64,18 @@ class MockSocket:
         self.blocking = True
         self.closed = False
 
+    def _verify_address_family(self, address):
+        if self._family == socket.AF_INET:
+            if len(address) != 2:
+                raise OSError(0, 'invalid IPv4 address tuple')
+        elif self._family == socket.AF_INET6:
+            if len(address) != 4:
+                raise OSError(0, 'invalid IPv6 address tuple')
+        try:
+            socket.inet_pton(self._family, address[0])
+        except OSError as e:
+            raise OSError(0, 'invalid bind address for family') from e
+
     def setblocking(self, blocking):
         if self.closed:
             raise OSError(0, 'socket closed')
@@ -81,10 +86,7 @@ class MockSocket:
             raise OSError(0, 'socket closed')
         if self.sockname is not None:
             raise OSError(0, 'socket already bound')
-        try:
-            socket.inet_pton(self._family, address[0])
-        except OSError as e:
-            raise OSError(0, 'invalid bind address family') from e
+        self._verify_address_family(address)
         self._bind_response(address)
         self.sockname = address
 
@@ -96,10 +98,7 @@ class MockSocket:
             raise OSError(0, 'socket closed')
         if self.peername is not None:
             raise OSError(0, 'socket already connected')
-        try:
-            socket.inet_pton(self._family, address[0])
-        except OSError as e:
-            raise OSError(0, 'invalid connect address family') from e
+        self._verify_address_family(address)
         await self._connect_response(address)
         self.peername = address
 
@@ -125,14 +124,51 @@ async def test_create_connected_sock_normal(event_loop, mocker):
 
 
 @pytest.mark.asyncio
-async def test_create_connected_sock_local_bind(event_loop, mocker):
+async def test_create_connected_sock_local_bind_v4(event_loop, mocker):
     mocker.patch('socket.socket', wraps=MockSocket)
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
     mocker.patch.object(
         event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
 
     s = await happy_eyeballs.create_connected_sock(
-        'magic-host', 80, local_addr=('localhost', 0))
+        'magic-host', 80, local_addrs=[('127.0.0.1', 0)])
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_local_bind_v6(event_loop, mocker):
+    mocker.patch('socket.socket', wraps=MockSocket)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    s = await happy_eyeballs.create_connected_sock(
+        'magic-host', 80, local_addrs=[('::1', 0, 0, 0)])
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_local_bind_v6v4(event_loop, mocker):
+    mocker.patch('socket.socket', wraps=MockSocket)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    s = await happy_eyeballs.create_connected_sock(
+        'magic-host', 80, local_addrs=LOCALHOST_ADDRS)
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_local_bind_v6v4_aiter(event_loop, mocker):
+    async def local_addrs():
+        for addr in LOCALHOST_ADDRS:
+            yield addr
+
+    mocker.patch('socket.socket', wraps=MockSocket)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    s = await happy_eyeballs.create_connected_sock(
+        'magic-host', 80, local_addrs=local_addrs())
 
 
 @pytest.mark.asyncio
@@ -172,7 +208,7 @@ async def test_create_connected_sock_ipv6_bind_fail(
         event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
 
     s = await happy_eyeballs.create_connected_sock(
-        'magic-host', 80, local_addr=('localhost', 0))
+        'magic-host', 80, local_addrs=[('::1', 0, 0, 0), ('127.0.0.1', 0)])
 
 
 @pytest.mark.asyncio
@@ -180,22 +216,20 @@ async def test_create_connected_sock_bind_order(
         event_loop,
         mocker,
 ):
-    local_addrinfo_lists = [
-        LOCALHOST_ADDRINFOS,
-        list(reversed(LOCALHOST_ADDRINFOS)),
+    local_addr_lists = [
+        LOCALHOST_ADDRS,
+        list(reversed(LOCALHOST_ADDRS)),
     ]
     remote_addrinfo_lists = [
         [IPV6_ADDRINFOS[0]],
         [IPV4_ADDRINFOS[0]],
     ]
 
-    for local_addrinfo, remote_addrinfo in itertools.product(
-            local_addrinfo_lists, remote_addrinfo_lists):
+    for local_addr, remote_addrinfo in itertools.product(
+            local_addr_lists, remote_addrinfo_lists):
 
         async def mock_gai(host, port, *, family=0, type=0, proto=0, flags=0):
-            if host == 'localhost':
-                return local_addrinfo
-            elif host == 'magic-host':
+            if host == 'magic-host':
                 return remote_addrinfo
             else:
                 raise socket.gaierror('invalid host')
@@ -206,7 +240,7 @@ async def test_create_connected_sock_bind_order(
             event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
 
         s = await happy_eyeballs.create_connected_sock(
-            'magic-host', 80, local_addr=('localhost', 0))
+            'magic-host', 80, local_addrs=local_addr)
 
 
 @pytest.mark.asyncio
@@ -280,7 +314,7 @@ async def test_create_connected_sock_connect_fail_different_exception(
 
     with pytest.raises(OSError) as exc_info:
         s = await happy_eyeballs.create_connected_sock(
-            'magic-host', 80, local_addr=('localhost', 0))
+            'magic-host', 80, local_addrs=LOCALHOST_ADDRS)
 
     assert exc_info.value.args[0].startswith('Multiple exceptions: ')
 
@@ -304,7 +338,7 @@ async def test_create_connected_sock_connect_fail_detailed_exception(
 
     with pytest.raises(async_stagger.exceptions.HappyEyeballsConnectError) as exc_info:
         s = await happy_eyeballs.create_connected_sock(
-            'magic-host', 80, local_addr=('localhost', 0),
+            'magic-host', 80, local_addrs=LOCALHOST_ADDRS,
             detailed_exceptions=True)
 
     exc = exc_info.value
