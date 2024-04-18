@@ -320,7 +320,7 @@ async def test_create_connected_sock_connect_fail_different_exception(
 
 
 @pytest.mark.asyncio
-async def test_create_connected_sock_connect_fail_detailed_exception(
+async def test_create_connected_sock_connect_fail_raise_exc_group(
         event_loop, mocker):
 
     class MockSocketConnectFail(MockSocket):
@@ -336,11 +336,11 @@ async def test_create_connected_sock_connect_fail_detailed_exception(
     mocker.patch.object(
         event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
 
-    with pytest.raises(async_stagger.exceptions.HappyEyeballsConnectError) as exc_info:
+    with pytest.raises(ExceptionGroup) as exc_info:
         s = await happy_eyeballs.create_connected_sock(
             'magic-host', 80, local_addrs=LOCALHOST_ADDRS,
-            detailed_exceptions=True)
+            raise_exc_group=True)
 
     exc = exc_info.value
-    assert len(exc.args[0]) == 16
-    assert all(isinstance(e, OSError) for e in exc.args[0])
+    assert len(exc.exceptions) == 16
+    assert all(isinstance(e, OSError) for e in exc.exceptions)

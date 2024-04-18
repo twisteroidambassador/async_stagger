@@ -73,7 +73,7 @@ async def create_connected_sock(
         interleave: int = FIRST_ADDRESS_FAMILY_COUNT,
         async_dns: bool = False,
         resolution_delay: float = RESOLUTION_DELAY,
-        detailed_exceptions: bool = False,
+        raise_exc_group: bool = False,
 ) -> socket.socket:
     """Connect to *(host, port)* and return a connected socket.
 
@@ -102,7 +102,7 @@ async def create_connected_sock(
 
     Args:
         host: Host name to connect to. Unlike
-            :func:`asyncio.create_connection`
+            :func:`asyncio.open_connection`
             there is no default, but it's still possible to manually specify
             *None* here.
 
@@ -117,7 +117,7 @@ async def create_connected_sock(
         proto: Socket protocol. Since the socket type is always
             :data:`socket.SOCK_STREAM`, proto can usually be left unspecified.
 
-        flags: Flags passed to :func:`~asyncio.AbstractEventLoop.getaddrinfo`.
+        flags: Flags passed to ``getaddrinfo``.
             See documentation on :func:`socket.getaddrinfo` for details.
             similar to *host* and *port*.
 
@@ -150,16 +150,15 @@ async def create_connected_sock(
             if IPv4 addresses are resolved first. This is the "Resolution
             Delay" as defined in :rfc:`8305`.
 
-        detailed_exceptions: Determines what exception to raise when all
-            connection attempts fail. If set to True, an instance of
-            :class:`~async_stagger.exceptions.HappyEyeballsConnectError`
-            is raised, which
-            contains the individual exceptions raised by each connection
+        raise_exc_group: Determines what exception to raise when all
+            connection attempts fail. If set to True, raise an instance of
+            :class:`ExceptionGroup`
+            containing all the individual exceptions raised by each connection
             and address resolution attempt.
             When set to false (default), an exception is raised the same
-            way as :func:`asyncio.create_connection`: if all the connection
+            way as :func:`asyncio.open_connection`: if all the connection
             attempt exceptions have the same ``str``, one of them is raised,
-            otherwise an instance of *OSError* is raised whose message contains
+            otherwise an instance of :class:`OSError` is raised whose message contains
             ``str`` representations of all connection attempt exceptions.
 
     Returns:
@@ -175,6 +174,10 @@ async def create_connected_sock(
     .. versionchanged:: v0.4.0
        *local_addrs* parameter now takes sync or async iterables of already-resolved
        addresses. Support for host names is removed.
+
+    .. versionchanged:: v0.4.0
+       the *detailed_exceptions* parameter is replaced by *raise_exc_group*.
+       When specified, an :class:`ExceptionGroup` is raised.
 
     .. versionremoved:: v0.4.0
        the *loop* parameter.
@@ -232,25 +235,14 @@ async def create_connected_sock(
     debug_log('Happy eyeballs connection to (%r, %r) from %r failed',
               host, port, local_addrs)
     if aiter_exc is not None:
-        if isinstance(aiter_exc, exceptions.HappyEyeballsConnectError):
-            exc.extend(aiter_exc.args[0])
+        if isinstance(aiter_exc, ExceptionGroup):
+            exc.extend(aiter_exc.exceptions)
         else:
             exc.append(aiter_exc)
-    if not detailed_exceptions:
-        # Raise one exception like loop.create_connection
-        if len(exc) == 1:
-            raise exc[0]
-        else:
-            # If they all have the same str(), raise one.
-            model = str(exc[0])
-            if all(str(e) == model for e in exc):
-                raise exc[0]
-            # Raise a combined exception so the user can see all
-            # the various error messages.
-            raise OSError('Multiple exceptions: {}'.format(
-                ', '.join(str(exc) for exc in exc)))
+    if not raise_exc_group:
+        exceptions.raise_one_exception_from_many(exc, OSError)
     else:
-        raise exceptions.HappyEyeballsConnectError(exc)
+        raise ExceptionGroup('happy eyeballs connection failed', exc)
 
 
 create_connected_sock_kwds = tuple(
