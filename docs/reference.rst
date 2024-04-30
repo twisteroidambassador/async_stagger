@@ -9,6 +9,13 @@ The Main Package
    :members:
 
 
+``resolvers``
+=============
+
+.. automodule:: async_stagger.resolvers
+   :members:
+
+
 ``aitertools``
 ==============
 

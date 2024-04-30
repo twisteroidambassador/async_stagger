@@ -4,8 +4,8 @@ import socket
 
 import pytest
 
-import async_stagger.exceptions
 from . import happy_eyeballs
+from . import resolvers
 
 
 pytestmark = pytest.mark.skipif(
@@ -114,13 +114,14 @@ async def mock_loop_sock_connect(sock, address):
 
 
 @pytest.mark.asyncio
-async def test_create_connected_sock_normal(event_loop, mocker):
-    mocker.patch('socket.socket', wraps=MockSocket)
-    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
-    mocker.patch.object(
-        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+async def test_create_connected_sock_normal(mocker):
+    event_loop = asyncio.get_running_loop()
+    with mocker.patch('socket.socket', wraps=MockSocket), \
+        mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo), \
+        mocker.patch.object(
+            event_loop, 'sock_connect', side_effect=mock_loop_sock_connect):
 
-    s = await happy_eyeballs.create_connected_sock('magic-host', 80)
+        s = await happy_eyeballs.create_connected_sock('magic-host', 80)
 
 
 @pytest.mark.asyncio
@@ -244,14 +245,26 @@ async def test_create_connected_sock_bind_order(
 
 
 @pytest.mark.asyncio
-async def test_create_connected_sock_async_normal(event_loop, mocker):
+async def test_create_connected_sock_resolver_concurrent(event_loop, mocker):
     mocker.patch('socket.socket', wraps=MockSocket)
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
     mocker.patch.object(
         event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
 
     s = await happy_eyeballs.create_connected_sock(
-        'magic-host', 80, async_dns=True)
+        'magic-host', 80, resolver=resolvers.concurrent_resolver)
+
+
+@pytest.mark.asyncio
+async def test_create_connected_sock_resolver_basic(event_loop, mocker):
+    mocker.patch('socket.socket', wraps=MockSocket)
+    mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
+    mocker.patch.object(
+        event_loop, 'sock_connect', side_effect=mock_loop_sock_connect)
+
+    s = await happy_eyeballs.create_connected_sock(
+        'magic-host', 80, resolver=resolvers.basic_resolver)
+
 
 
 @pytest.mark.asyncio
@@ -271,7 +284,7 @@ async def test_create_connected_sock_async_ipv6_resolve_slow(
 
     start_time = event_loop.time()
     s = await happy_eyeballs.create_connected_sock(
-        'magic-host', 80, async_dns=True)
+        'magic-host', 80, resolver=resolvers.concurrent_resolver)
     assert event_loop.time() - start_time < 1
     assert s._family == socket.AF_INET
 

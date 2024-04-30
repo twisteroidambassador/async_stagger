@@ -59,7 +59,7 @@ async def test_builtin_resolver_both(
         event_loop: asyncio.AbstractEventLoop, mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
-    infos = await list_from_aiter(resolvers.builtin_resolver('localhost', 80))
+    infos = await list_from_aiter(resolvers.basic_resolver('localhost', 80))
     assert infos == list(roundrobin(IPV6_ADDRINFOS, IPV4_ADDRINFOS))
 
 
@@ -69,7 +69,7 @@ async def test_builtin_resolver_fafc(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolvers.builtin_resolver('localhost', 80, first_addr_family_count=2))
+        resolvers.basic_resolver('localhost', 80, first_addr_family_count=2))
     assert infos == [
         IPV6_ADDRINFOS[0],
         IPV6_ADDRINFOS[1],
@@ -88,7 +88,7 @@ async def test_builtin_resolver_family_af_inet(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolvers.builtin_resolver('localhost', 80, family=socket.AF_INET))
+        resolvers.basic_resolver('localhost', 80, family=socket.AF_INET))
     assert infos == IPV4_ADDRINFOS
 
 
@@ -98,7 +98,7 @@ async def test_builtin_resolver_family_af_inet6(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolvers.builtin_resolver('localhost', 80, family=socket.AF_INET6),)
+        resolvers.basic_resolver('localhost', 80, family=socket.AF_INET6),)
     assert infos == IPV6_ADDRINFOS
 
 
@@ -112,7 +112,7 @@ async def test_async_resolver_gai_empty(mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
 
     with pytest.raises(socket.gaierror) as exc_info:
-        await list_from_aiter(resolvers.async_builtin_resolver('localhost', 80))
+        await list_from_aiter(resolvers.concurrent_resolver('localhost', 80))
 
     assert 'returned empty list' in str(exc_info.value)
 
@@ -127,7 +127,7 @@ async def test_async_resolver_gai_empty_raise_exc_group(mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
 
     with pytest.raises(ExceptionGroup) as exc_info:
-        await list_from_aiter(resolvers.async_builtin_resolver('localhost', 80, raise_exc_group=True))
+        await list_from_aiter(resolvers.concurrent_resolver('localhost', 80, raise_exc_group=True))
 
     assert len(exc_info.value.exceptions) == 2
     assert all(isinstance(e, OSError) for e in exc_info.value.exceptions)
@@ -144,7 +144,7 @@ async def test_async_resolver_gai_exc(mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
 
     with pytest.raises(socket.gaierror) as exc_info:
-        await list_from_aiter(resolvers.async_builtin_resolver('localhost', 80))
+        await list_from_aiter(resolvers.concurrent_resolver('localhost', 80))
 
 
 @pytest.mark.asyncio
@@ -157,7 +157,7 @@ async def test_async_resolver_gai_exc_raise_exc_group(mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=empty_gai)
 
     with pytest.raises(ExceptionGroup) as exc_info:
-        await list_from_aiter(resolvers.async_builtin_resolver('localhost', 80, raise_exc_group=True))
+        await list_from_aiter(resolvers.concurrent_resolver('localhost', 80, raise_exc_group=True))
 
     assert len(exc_info.value.exceptions) == 2
     assert all(isinstance(e, socket.gaierror) for e in exc_info.value.exceptions)
@@ -176,7 +176,7 @@ async def test_async_resolver_ipv6_exc(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver('localhost', 80))
+        resolvers.concurrent_resolver('localhost', 80))
     assert infos == IPV4_ADDRINFOS
 
 
@@ -193,7 +193,7 @@ async def test_async_resolver_ipv4_exc(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver('localhost', 80))
+        resolvers.concurrent_resolver('localhost', 80))
     assert infos == IPV6_ADDRINFOS
 
 
@@ -203,7 +203,7 @@ async def test_async_resolver_both(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver('localhost', 80),
+        resolvers.concurrent_resolver('localhost', 80),
         0.25,
     )
     assert infos == list(roundrobin(IPV6_ADDRINFOS, IPV4_ADDRINFOS))
@@ -227,7 +227,7 @@ async def test_async_resolver_ipv6_slightly_slow(mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver('localhost', 80, resolution_delay=0.5),
+        resolvers.concurrent_resolver('localhost', 80, resolution_delay=0.5),
         0.25,
     )
     assert infos == list(roundrobin(IPV6_ADDRINFOS, IPV4_ADDRINFOS))
@@ -251,7 +251,7 @@ async def test_async_resolver_ipv6_very_slow(mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver('localhost', 80, resolution_delay=0.05),
+        resolvers.concurrent_resolver('localhost', 80, resolution_delay=0.05),
         0.25,
     )
     assert infos == list(roundrobin(IPV4_ADDRINFOS, IPV6_ADDRINFOS))
@@ -275,7 +275,7 @@ async def test_async_resolver_ipv6_extremely_slow(mocker):
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_gai)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver('localhost', 80, resolution_delay=0.05),
+        resolvers.concurrent_resolver('localhost', 80, resolution_delay=0.05),
         0,
     )
     assert infos == IPV4_ADDRINFOS + IPV6_ADDRINFOS
@@ -287,7 +287,7 @@ async def test_async_resolver_fafc(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver(
+        resolvers.concurrent_resolver(
             'localhost', 80, first_addr_family_count=2),
         0.1,
     )
@@ -309,7 +309,7 @@ async def test_async_resolver_family_af_inet(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver('localhost', 80, family=socket.AF_INET),
+        resolvers.concurrent_resolver('localhost', 80, family=socket.AF_INET),
         0.25,
     )
     assert infos == IPV4_ADDRINFOS
@@ -321,7 +321,7 @@ async def test_async_resolver_family_af_inet6(
     mocker.patch.object(event_loop, 'getaddrinfo', side_effect=mock_getaddrinfo)
 
     infos = await list_from_aiter(
-        resolvers.async_builtin_resolver(
+        resolvers.concurrent_resolver(
             'localhost', 80, family=socket.AF_INET6),
         0.25,
     )

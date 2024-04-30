@@ -8,7 +8,7 @@ from . import aitertools
 from . import resolvers
 from .stagger import staggered_race
 from .debug import debug_log
-from .typing import AddrInfoType, HostType, PortType
+from .typing import AddrInfoType, HostType, PortType, ResolverType
 from .constants import (
     CONNECT_DELAY, FIRST_ADDRESS_FAMILY_COUNT, RESOLUTION_DELAY)
 
@@ -70,9 +70,7 @@ async def create_connected_sock(
         flags: int = 0,
         local_addrs: Iterable[tuple] | AsyncIterable[tuple] = None,
         delay: Optional[float] = CONNECT_DELAY,
-        interleave: int = FIRST_ADDRESS_FAMILY_COUNT,
-        async_dns: bool = False,
-        resolution_delay: float = RESOLUTION_DELAY,
+        resolver: ResolverType = resolvers.concurrent_resolver,
         raise_exc_group: bool = False,
 ) -> socket.socket:
     """Connect to *(host, port)* and return a connected socket.
@@ -133,22 +131,15 @@ async def create_connected_sock(
             addresses. This is the "Connect Attempt Delay" as defined in
             :rfc:`8305`.
 
-        interleave: Whether to interleave resolved addresses by address family.
-            0 means not to interleave and simply use the returned order.
-            An integer >= 1 is interpreted as
-            "First Address Family Count" defined in :rfc:`8305`,
-            i.e. the reordered list will have this many addresses for the
-            first address family,
-            and the rest will be interleaved one to one.
+        resolver: The resolver to use.
+            To customize behavior of the resolver, use :func:`functools.partial`
+            to bind arguments to the resolver before passing it in.
+            for example, to set "First Address Family Count" to 2:
 
-        async_dns: Do asynchronous DNS resolution, where IPv6 and IPv4
-            addresses are resolved in parallel, and connection attempts can
-            be made as soon as either address family is resolved. This behavior
-            is described in :rfc:`8305#section-3`.
+            .. code-block:: python
 
-        resolution_delay: Amount of time to wait for IPv6 addresses to resolve
-            if IPv4 addresses are resolved first. This is the "Resolution
-            Delay" as defined in :rfc:`8305`.
+                resolver = functools.partial(async_stagger.resolvers.concurrent_resolver, first_addr_family_count=2)
+                socket = await async_stagger.create_connected_sock(..., resolver=resolver)
 
         raise_exc_group: Determines what exception to raise when all
             connection attempts fail. If set to True, raise an instance of
@@ -191,15 +182,10 @@ async def create_connected_sock(
               'local addresses %r',
               host, port, local_addrs)
 
-    if not async_dns:
-        remote_addrinfo_aiter = resolvers.builtin_resolver(
-            host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
-            flags=flags, first_addr_family_count=interleave)
-    else:
-        remote_addrinfo_aiter = resolvers.async_builtin_resolver(
-            host, port, family=family, type_=socket.SOCK_STREAM, proto=proto,
-            flags=flags, resolution_delay=resolution_delay,
-            first_addr_family_count=interleave)
+    remote_addrinfo_aiter = resolver(
+        host, port,
+        family=family, type=socket.SOCK_STREAM, proto=proto, flags=flags,
+    )
 
     if local_addrs is not None:
         try:
@@ -257,9 +243,8 @@ async def create_connection(
 ) -> tuple[asyncio.Transport, asyncio.Protocol]:
     """Connect to *(host, port)* and return *(transport, protocol)*.
 
-    This function does the same thing as
-    :meth:`asyncio.AbstractEventLoop.create_connection`,
-    only more awesome with Happy Eyeballs.
+    This is a replacement for :meth:`asyncio.loop.create_connection` with added
+    Happy Eyeballs.
     Refer to that function's documentation for
     explanations of these arguments: *protocol_factory*, *ssl*, and
     *server_hostname*. Refer to :func:`~async_stagger.create_connected_sock`
@@ -267,7 +252,7 @@ async def create_connection(
 
     Returns:
         *(transport, protocol)*, the same as
-        :meth:`asyncio.AbstractEventLoop.create_connection`.
+        :meth:`asyncio.loop.create_connection`.
     """
     loop = asyncio.get_running_loop()
     # To avoid the trouble of synchronizing this function's argument list
@@ -303,8 +288,9 @@ async def open_connection(
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
     """Connect to (host, port) and return (reader, writer).
 
-    This function does the same thing as :func:`asyncio.open_connection`, with
-    added awesomeness of Happy Eyeballs. Refer to the documentation of that
+    This is a replacement for :func:`asyncio.open_connection` with added
+    Happy Eyeballs.
+    Refer to the documentation of that
     function for what *limit* does, and refer to
     :func:`~async_stagger.create_connection` and
     :func:`~async_stagger.create_connected_sock` for everything else.
