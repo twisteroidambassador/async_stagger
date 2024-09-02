@@ -15,6 +15,9 @@ and :func:`~async_stagger.aitertools.anext`
 from :mod:`~async_stagger.aitertools`
 because they are now built-in.
 
+v0.4.0.post1 includes no code changes.
+Only changes to the documentation and metadata are made.
+
 v0.3.1
 ======
 

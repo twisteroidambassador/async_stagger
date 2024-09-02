@@ -5,7 +5,7 @@ with open('README.rst', 'rt') as readme_file:
 
 setup(
     name='async_stagger',
-    version='0.4.0',
+    version='0.4.0.post1',
     description='Happy eyeballs and underlying scheduling algorithm in asyncio',
     long_description=long_description,
     long_description_content_type='text/x-rst',
