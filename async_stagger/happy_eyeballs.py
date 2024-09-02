@@ -22,13 +22,11 @@ __all__ = [
 async def _connect_sock(
         addr_info: AddrInfoType,
         local_addr: tuple = None,
-        *,
-        loop: asyncio.AbstractEventLoop = None
 ) -> socket.socket:
     """Create, bind and connect one socket."""
     debug_log('Creating socket with remote addrinfo %r, local addr %r',
               addr_info, local_addr)
-    loop = loop or asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     family, type_, proto, _, address = addr_info
     try:
         sock = socket.socket(family=family, type=type_, proto=proto)
@@ -176,8 +174,6 @@ async def create_connected_sock(
     .. versionremoved:: v0.4.0
        the *local_addr* parameter. Use *local_addrs* instead.
     """
-    loop = asyncio.get_running_loop()
-
     debug_log('Starting Happy Eyeballs connection to (%r, %r), '
               'local addresses %r',
               host, port, local_addrs)
@@ -199,7 +195,7 @@ async def create_connected_sock(
         async for ai, la in aitertools.product(
             remote_addrinfo_aiter, local_addrs_aiter
         ):
-            yield partial(_connect_sock, ai, la, loop=loop)
+            yield partial(_connect_sock, ai, la)
 
     # Use a separate task for each (remote_addr, local_addr) pair. When
     # multiple local addresses are specified, this depends on the OS quickly
