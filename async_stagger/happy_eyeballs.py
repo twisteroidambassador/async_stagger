@@ -9,8 +9,7 @@ from . import resolvers
 from .stagger import staggered_race
 from .debug import debug_log
 from .typing import AddrInfoType, HostType, PortType, ResolverType
-from .constants import (
-    CONNECT_DELAY, FIRST_ADDRESS_FAMILY_COUNT, RESOLUTION_DELAY)
+from .constants import CONNECT_DELAY
 
 __all__ = [
     'create_connected_sock',
