@@ -48,6 +48,12 @@ from .debug import debug_log
 from .constants import RESOLUTION_DELAY, FIRST_ADDRESS_FAMILY_COUNT
 
 
+__all__ = [
+    'basic_resolver',
+    'concurrent_resolver',
+]
+
+
 _HAS_IPv6 = hasattr(socket, 'AF_INET6')
 
 
