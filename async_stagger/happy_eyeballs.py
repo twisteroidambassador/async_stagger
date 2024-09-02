@@ -83,17 +83,13 @@ async def create_connected_sock(
 
     (Some fancier features specified in :rfc:`8305`, like
     statefulness and features related to NAT64 and DNS64 are not
-    implemented. Destination address sorting is left for the operating
-    system; it is assumed that the addresses returned by
-    :func:`~asyncio.AbstractEventLoop.getaddrinfo` is already sorted
-    according to OS's preferences.)
+    implemented.)
 
     Most of the arguments should be familiar from the various :mod:`socket` and
     :mod:`asyncio` methods.
-    *delay*, *interleave*, *async_dns* and *resolution_delay*
-    control Happy Eyeballs-specific behavior.
-    *local_addrs* is a new argument providing new features not specific to
-    Happy Eyeballs.
+    *delay* and *resolver* control Happy Eyeballs-specific behavior.
+    *local_addr* is removed in favor of *local_addrs*, which provides new
+    features not specific to Happy Eyeballs.
 
     The *host*, *port*, *family*, *proto* and *flags* parameters are passed
     directly to the *resolver* being used. If you're using a custom resolver,
