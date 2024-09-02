@@ -24,7 +24,7 @@ setup(
     ],
     keywords='happy-eyeballs dual-stack tcp',
     project_urls={
-        'Documentation': 'https://async_stagger.readthedocs.io',
+        'Documentation': 'https://async-stagger.readthedocs.io',
     },
     packages=find_packages(),
     python_requires='>=3.11',
