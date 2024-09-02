@@ -1,11 +1,14 @@
 Changelog
 #########
 
-Unreleased
+v0.4.0
 ==========
 
 Started using features in Python 3.11.
 As a result, dropped support for Python 3.10 and lower.
+
+Factored out resolvers from the main connection logic.
+Resolvers can now be customized and plugged into `open_connection` and friends.
 
 Removed :func:`~async_stagger.aitertools.aiter`
 and :func:`~async_stagger.aitertools.anext`

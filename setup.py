@@ -5,7 +5,7 @@ with open('README.rst', 'rt') as readme_file:
 
 setup(
     name='async_stagger',
-    version='0.3.1',
+    version='0.4.0',
     description='Happy eyeballs and underlying scheduling algorithm in asyncio',
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -19,17 +19,15 @@ setup(
         'Framework :: AsyncIO',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
     ],
     keywords='happy-eyeballs dual-stack tcp',
     project_urls={
-        'Documentation': 'http://async_stagger.readthedocs.io',
+        'Documentation': 'https://async_stagger.readthedocs.io',
     },
     packages=find_packages(),
-    python_requires='>=3.6',
+    python_requires='>=3.11',
     extras_require={
         'test': ['pytest', 'pytest-asyncio', 'pytest-mock'],
     }

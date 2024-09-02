@@ -94,10 +94,8 @@ logic as a reusable block: ``staggered_race``. It can be use when:
 Where can I get it?
 -------------------
 
-``async_stagger`` requires Python 3.6 or later.
-(v0.2.0 onwards uses more new features in 3.6 such as async generators and
-async comprehensions, so it will probably require more than cosmetic changes
-to make it run on 3.5.)
+``async_stagger`` requires Python 3.11 or later from v0.4.0 onwards.
+Please use v0.3.1 for Python 3.6 - 3.10.
 It does not have any external dependencies.
 Install it from PyPI the usual way::
 
@@ -141,15 +139,6 @@ and this module reflects the things I have learned. However I have yet to
 eat my own dog food and actually import this module from those other projects.
 I would love to hear people's experience using this module in real world
 conditions.
-
-`bpo-31861 <https://bugs.python.org/issue31861>`_ talks about adding native
-``aiter`` and ``anext`` functions either as builtins or to the ``operator``
-module. Well, I want them NAO!!!one!!!eleventy!! So I borrowed the
-implementations from that bpo and put them in the ``aitertools`` submodule.
-I have only kept the one-argument forms; In particular, the two-argument
-``iter`` function is so disparate from the one-argument version, that I don't
-think they belong to the same function at all, and there really shouldn't be
-a need for ``aiter`` to emulate that behavior.
 
 
 Acknowledgments
