@@ -95,6 +95,10 @@ async def create_connected_sock(
     *local_addrs* is a new argument providing new features not specific to
     Happy Eyeballs.
 
+    The *host*, *port*, *family*, *proto* and *flags* parameters are passed
+    directly to the *resolver* being used. If you're using a custom resolver,
+    you should verify its support for these parameters.
+
     Args:
         host: Host name to connect to. Unlike
             :func:`asyncio.open_connection`
@@ -159,6 +163,9 @@ async def create_connected_sock(
     .. versionadded:: v0.2.1
        the *async_dns* and *resolution_delay* parameters.
 
+    .. versionadded:: v0.4.0
+       the *resolver* parameter.
+
     .. versionchanged:: v0.4.0
        *local_addrs* parameter now takes sync or async iterables of already-resolved
        addresses. Support for host names is removed.
@@ -172,6 +179,10 @@ async def create_connected_sock(
 
     .. versionremoved:: v0.4.0
        the *local_addr* parameter. Use *local_addrs* instead.
+
+    .. versionremoved:: v0.4.0
+       the *interleave*, *async_dns* and *resolution_delay* parameters.
+       Specify them on *resolver* instead.
     """
     debug_log('Starting Happy Eyeballs connection to (%r, %r), '
               'local addresses %r',
