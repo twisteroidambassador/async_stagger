@@ -1,6 +1,6 @@
 import asyncio
 import itertools
-from typing import AsyncIterable, List
+from typing import AsyncIterable
 
 import pytest
 
@@ -23,7 +23,7 @@ async def test_aiter_from_iter():
     assert lst == new_lst
 
 
-async def list_from_aiter(aiterable: AsyncIterable) -> List:
+async def list_from_aiter(aiterable: AsyncIterable) -> list:
     new_list = []
     async for item in aiterable:
         new_list.append(item)
