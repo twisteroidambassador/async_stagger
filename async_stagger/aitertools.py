@@ -60,7 +60,14 @@ async def product(
     Compute the cartesian product of input iterables. The arguments are
     analogous to its :mod:`itertools` counterpart.
 
-    The input async iterables are evaluated lazily. As a result the last
+    Notes on concurrency:
+
+    Getting the first values from *aiterables* are run in parallel.
+    If any async iterator(s) raises an exception, they are wrapped up in an
+    :class:`ExceptionGroup`.
+
+    In later steps, each input async iterables is evaluated lazily when needed.
+    As a result the last
     input iterable is iterated and exhausted first, then the next-to-last is
     iterated, and so on.
 
@@ -69,6 +76,9 @@ async def product(
 
         repeat: used to compute the product of input async iterables with
             themselves.
+    
+    .. versionchanged:: v0.4.1
+       :class:`ExceptionGroup`s can now be raised in certain situations.
     """
     if not isinstance(repeat, int):
         raise TypeError(
@@ -85,11 +95,21 @@ async def product(
         return
     aiterators = [aiter(a) for a in aiterables]
     try:
+        some_aiterators_empty = False
         try:
-            initial_values = await asyncio.gather(*(anext(a) for a in aiterators))
-        except StopAsyncIteration:
+            initial_values = [None] * len(aiterators)
+
+            async def store_initial_value(i, a):
+                initial_values[i] = await(anext(a))
+
+            async with asyncio.TaskGroup() as group:
+                for i, a in enumerate(aiterators):
+                    group.create_task(store_initial_value(i, a))
+        except* StopAsyncIteration:
             # some of the aiterators are empty:
             # yield nothing to match itertools.product
+            some_aiterators_empty = True
+        if some_aiterators_empty:
             return
         initial_prefix = initial_values * (repeat - 1)
         yield tuple(itertools.chain(initial_prefix, initial_values))
