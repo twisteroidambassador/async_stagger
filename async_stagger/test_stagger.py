@@ -73,6 +73,56 @@ async def random_tasks():
 
 
 @pytest.mark.asyncio
+async def test_stagger_tasks_nosleep():
+    async def one_coro(index):
+        if index > 8:
+            return index
+        raise RuntimeError
+    
+    coro_fns = aiter_from_iter(partial(one_coro, i) for i in range(12))
+    winner_result, winner_idx, exc, aiter_exc = await staggered_race(coro_fns, 0.1)
+    assert winner_idx == 9
+    assert winner_result == 9
+    assert len(exc) == 10
+    assert aiter_exc is None
+
+
+@pytest.mark.asyncio
+async def test_stagger_random_tasks_possible_nosleep():
+    for _ in range(10):
+        await random_tasks_possible_nosleep()
+
+
+async def random_tasks_possible_nosleep():
+    async def one_coro(index, sleep_for, succeed):
+        print('Coroutine %d starting, will sleep for %f' % (index, sleep_for))
+        if sleep_for > 0:
+            await asyncio.sleep(sleep_for)
+        if succeed:
+            print('Coroutine %d finishing' % index)
+            return index
+        else:
+            print('Coroutine %d raising RuntimeError' % index)
+            raise RuntimeError
+
+    coro_fns = aiter_from_iter(
+        partial(one_coro, i, 0 if random.random() < 0.8 else random.random() * 2, random.random() < 0.8)
+        for i in range(10))
+    delay = 0.3
+    winner_result, winner_idx, exc, aiter_exc = \
+        await staggered_race(coro_fns, delay)
+    if winner_idx is not None:
+        assert winner_result == winner_idx
+        for i, e in enumerate(exc):
+            if i == winner_idx:
+                assert e is None
+            else:
+                assert isinstance(e, (RuntimeError, asyncio.CancelledError))
+    else:
+        assert all(isinstance(e, RuntimeError) for e in exc)
+
+
+@pytest.mark.asyncio
 async def test_stagger_coro_gen():
     for _ in range(10):
         await infinite_coros()
