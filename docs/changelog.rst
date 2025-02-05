@@ -6,7 +6,7 @@ v0.4.1
 
 Eager task factories, introduced in Python 3.12, is now supported.
 
-:func:`~async_stagger.aitertools.product` may now raise :class:`ExceptionGroup`s
+:func:`~async_stagger.aitertools.product` may now raise :class:`ExceptionGroup` s
 if some async iterables raises exceptions producing a first output.
 
 v0.4.0

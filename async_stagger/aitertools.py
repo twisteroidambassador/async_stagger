@@ -78,7 +78,7 @@ async def product(
             themselves.
     
     .. versionchanged:: v0.4.1
-       :class:`ExceptionGroup`s can now be raised in certain situations.
+       :class:`ExceptionGroup` s can now be raised in certain situations.
     """
     if not isinstance(repeat, int):
         raise TypeError(
