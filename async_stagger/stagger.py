@@ -92,7 +92,7 @@ async def staggered_race(
     winner_result = None
     winner_index = None
     exceptions = []
-    tasks = []
+    tasks = set()
     taskgroup = asyncio.TaskGroup()
     aiter_exc = None
 
@@ -100,6 +100,11 @@ async def staggered_race(
             previous_failed: Optional[asyncio.Event],
             this_index: int = 0,
     ) -> None:
+        this_task = asyncio.current_task()
+        # If we're running under eager task factory, add this_task to tasks.
+        # If we're running under lazy task factory, then this_task has already
+        # been added to tasks, and this is a no-op.
+        tasks.add(this_task)
         # Wait for the previous task to finish, or for delay seconds
         if previous_failed is not None:
             with suppress(asyncio.TimeoutError):
@@ -120,8 +125,10 @@ async def staggered_race(
         # Start task that will run the next coroutine
         this_failed = asyncio.Event()
         next_task = taskgroup.create_task(run_one_coro(this_failed, this_index+1))
-        tasks.append(next_task)
-        assert len(tasks) == this_index + 2
+        # If we're running under lazy task factory, add next_task to tasks.
+        # If we're running under eager task factory, then next_task has already been
+        # added to tasks by itself, and this is a no-op.
+        tasks.add(next_task)
         # Prepare place to put this coroutine's exceptions if not won
         exceptions.append(None)
         assert len(exceptions) == this_index + 1
@@ -154,8 +161,8 @@ async def staggered_race(
             # up as done() == True, cancelled() == False, exception() ==
             # asyncio.CancelledError, which is normally not possible.
             # https://bugs.python.org/issue33413
-            for i, t in enumerate(tasks):
-                if i != this_index:
+            for t in tasks:
+                if t is not this_task:
                     t.cancel()
             # Note: we could also have abused the cancellation handling of
             # TaskGroups to cancel all other tasks, by raising an exception
@@ -170,7 +177,7 @@ async def staggered_race(
     try:
         async with taskgroup:
             first_task = taskgroup.create_task(run_one_coro(None))
-            tasks.append(first_task)
+            tasks.add(first_task)
             # exiting *async with* waits for all tasks in taskgroup
             # If any task in taskgroup raises an unhandled exception,
             # a BaseExceptionGroup will be raised here
