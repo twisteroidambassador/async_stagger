@@ -13,6 +13,27 @@ simply use ``async_stagger.open_connection`` like you would use
 Now your connections are more dual-stack friendly and will complete faster!
 A replacement for ``loop.create_connection`` is also provided.
 
+
+The current state of Happy Eyeballs in the Python ecosystem
+===========================================================
+
+The native **asyncio** module had supported happy eyeballs since Python 3.8.1.
+It's still not default behavior, though, and must be turned on deliberately.
+See `the docs`__ for details.
+
+__ https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.create_connection
+
+[**aiohttp**](https://github.com/aio-libs/aiohttp)'s HTTP client uses happy
+eyeballs by default,
+and the devs maintain a vendored implementation as
+[aiohappyeyeballs](https://github.com/aio-libs/aiohappyeyeballs).
+
+Along with this repository,
+the 3 implementations started very similar,
+but has diverged a lot in time in order to keep up with changes in **asyncio**,
+particularly with the introduction of ``eager_task_factory`` in Python 3.12.
+
+
 The long version
 ================
 
@@ -47,9 +68,6 @@ successfully.
 
 Happy Eyeballs is particularly important for dual-stack clients, when some hosts
 may have resolvable IPv6 addresses that are somehow unreachable.
-
-Starting from Python 3.8, stock **asyncio** also supports Happy Eyeballs.
-See below for a comparison.
 
 
 What does ``async_stagger`` has to offer?
@@ -108,37 +126,6 @@ This project is under active development, and APIs may change in the future.
 Check out the Changelog in the documentation.
 
 This project is licensed under the MIT license.
-
-
-Python 3.8 Has Native Happy Eyeballs Now
-========================================
-
-I contributed an implementation of Happy Eyeballs to upstream **asyncio**,
-and it landed in Python 3.8: see `the docs`__ for details.
-
-__ https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.create_connection
-
-That implementation is essentially an early version of this package,
-so it lacks these features:
-
-* Async address resolution
-* Detailed exception report
-* The ``local_addrs`` argument (as opposed to ``local_addr``)
-
-Still, it should be sufficient for most scenarios, and it's right there in the standard library.
-
-
-Miscellaneous Remarks
-=====================
-
-Asynchronous address resolution is added in v0.2.1. With that, I feel that
-the package should be fairly feature-complete.
-
-I have implemented Happy Eyeballs-like algorithms in some of my other projects,
-and this module reflects the things I have learned. However I have yet to
-eat my own dog food and actually import this module from those other projects.
-I would love to hear people's experience using this module in real world
-conditions.
 
 
 Acknowledgments

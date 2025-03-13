@@ -36,7 +36,8 @@ Install through PyPI as usual:
 
    pip install async-stagger
 
-Python 3.6 or above is required.
+Python 3.11 or above is required.
+For older versions of Python, use a previous release.
 
 
 Making TCP connections using Happy Eyeballs
