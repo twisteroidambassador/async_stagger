@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "async_stagger"
+version = "0.4.1a1"
+authors = [
+  { name="twisteroid ambassador", email="twisteroid.ambassador@gmail.com" },
+]
+description = "Happy eyeballs and underlying scheduling algorithm in asyncio"
+readme = "README.rst"
+keywords = ["happy-eyeballs", "dual-stack", "tcp"]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Framework :: AsyncIO",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "pytest-asyncio",
+]
+
+[project.urls]
+Homepage = "https://github.com/twisteroidambassador/async_stagger"
+Documentation = "https://async-stagger.readthedocs.io"
+
+[tool.setuptools]
+packages = ["async_stagger"]
