@@ -14,7 +14,7 @@ available_policies = [
 if len(available_policies) > 1:
     # If there's more than one policies, then it must have one default and at least two named policies
     assert len(available_policies) > 2
-    available_policies.pop('DefaultEventLoopPolicy')
+    available_policies.remove('DefaultEventLoopPolicy')
 
 try:
     import uvloop
