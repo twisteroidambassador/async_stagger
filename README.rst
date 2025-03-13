@@ -23,7 +23,7 @@ See `the docs`__ for details.
 
 __ https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.create_connection
 
-`**aiohttp** <https://github.com/aio-libs/aiohttp>`_'s HTTP client uses happy
+`aiohttp <https://github.com/aio-libs/aiohttp>`_'s HTTP client uses happy
 eyeballs by default,
 and the devs maintain a vendored implementation as
 `aiohappyeyeballs <https://github.com/aio-libs/aiohappyeyeballs>`_.
