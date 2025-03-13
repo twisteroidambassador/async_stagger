@@ -4,17 +4,12 @@ import pytest
 
 
 # Find all available event loop policies in asyncio, and in uvloop if installed
-available_policies = [
+available_policies = {
     getattr(asyncio, p)
     for p in dir(asyncio)
     if p.endswith('EventLoopPolicy')
     and not p.startswith('Abstract')
-]
-
-if len(available_policies) > 1:
-    # If there's more than one policies, then it must have one default and at least two named policies
-    assert len(available_policies) > 2
-    available_policies.remove('DefaultEventLoopPolicy')
+}
 
 try:
     import uvloop
@@ -23,7 +18,7 @@ try:
     class UvloopEventLoopPolicy(uvloop.EventLoopPolicy):
         pass
 
-    available_policies.append(UvloopEventLoopPolicy)
+    available_policies.add(UvloopEventLoopPolicy)
 except ImportError:
     pass
 
@@ -45,7 +40,7 @@ if hasattr(asyncio, 'eager_task_factory'):
     eager_policies = []
     for policy in available_policies:
         eager_policies.append(create_eager_policy(policy))
-    available_policies.extend(eager_policies)
+    available_policies.update(eager_policies)
 
 
 # Run each test with each policy
