@@ -308,7 +308,17 @@ async def _async_concurrent_resolver(
             if len(addrinfos) > next_yield_idx:
                 next_yield_value = addrinfos[next_yield_idx]
                 next_yield_idx += 1
-                yield next_yield_value
+                try:
+                    yield next_yield_value
+                except GeneratorExit:
+                    # If unhandled, this GeneratorExit ends up wrapped in an BaseExceptionGroup,
+                    # and triggers a "Task exception was never retrieved" message.
+                    # We could get cancellation for free if we don't handle it here and
+                    # do `except* GeneratorExit` outside the TaskGroup, but then it becomes
+                    # more awkward to return since we can't `return` within `except*`.
+                    v6_task.cancel()
+                    v4_task.cancel()
+                    return
                 continue
             if v6_task.done() and v4_task.done():
                 break
